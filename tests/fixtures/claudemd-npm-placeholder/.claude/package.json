@@ -1,0 +1,7 @@
+{
+  "name": "demo-app",
+  "scripts": {
+    "build:oss": "ng build InfinityOSS",
+    "oss:test": "vitest run projects/infinity-oss"
+  }
+}

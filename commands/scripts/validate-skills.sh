@@ -535,7 +535,17 @@ check_npm_scripts_in_file() {
         [ -z "$script" ] && continue
         _npm_script_status "$script" "$base_dir" && status=0 || status=$?
         [ "$status" = 1 ] && error "[CLAUDEMD-DEAD-SCRIPT] $display: \`npm run $script\` is not defined in package.json"
-    done < <(grep -oE 'npm run [A-Za-z0-9:_-]+' "$src" 2>/dev/null | awk '{print $3}' | sort -u || true)
+    done < <(grep -oE 'npm run [A-Za-z0-9:_-]+.?' "$src" 2>/dev/null | awk '
+        {
+            tok = $3
+            # The token charset stops at a placeholder boundary, leaving a stub that is
+            # not a script name: `build:[project]`, `test:*`, `oss|istra:test`, `<app>:start`.
+            # The captured trailing character tells us which case we are in.
+            if (substr(tok, length(tok), 1) ~ /[][*|<]/) next
+            sub(/[^A-Za-z0-9:_-]+$/, "", tok)
+            if (tok == "" || tok ~ /:$/) next
+            print tok
+        }' | sort -u || true)
     # The loop's status is that of its last body command; when the final scanned
     # script is live, `[ "$status" = 1 ]` is false and `set -e` would abort the run.
     return 0
