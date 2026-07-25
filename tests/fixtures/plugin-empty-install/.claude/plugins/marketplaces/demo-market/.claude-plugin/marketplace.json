@@ -1,0 +1,12 @@
+{
+  "name": "demo-market",
+  "owner": { "name": "Demo" },
+  "plugins": [
+    {
+      "name": "hollow-plugin",
+      "description": "Declares no capabilities anywhere — a genuinely broken install",
+      "version": "1.0.0",
+      "source": "./plugins/hollow-plugin"
+    }
+  ]
+}

@@ -66,6 +66,25 @@ emit_finding() {
         '{phase:$p, tag:$t, scope:$s, path:$ph, message:$m}' >>"$TMP_FINDINGS"
 }
 
+# A plugin key is `<name>@<marketplace>`. Returns 0 when that marketplace's catalog
+# entry declares the plugin's capabilities inline — lspServers / mcpServers / hooks /
+# outputStyles — or marks it non-strict. Such a plugin ships no plugin.json by design
+# (e.g. typescript-lsp: lspServers + "strict": false, version dir holds only LICENSE
+# and README), so the absence of a manifest is not a defect.
+_marketplace_declares_capabilities() {
+    local key="$1" name="${1%@*}" mkt="${1##*@}" catalog
+    [ "$name" = "$key" ] && return 1
+    catalog="$USER_TREE/plugins/marketplaces/$mkt/.claude-plugin/marketplace.json"
+    [ -f "$catalog" ] || return 1
+    jq -e --arg n "$name" '
+        (.plugins // [])
+        | map(select(.name == $n))
+        | .[0] // empty
+        | select(has("lspServers") or has("mcpServers") or has("hooks")
+                 or has("outputStyles") or (.strict == false))
+    ' "$catalog" >/dev/null 2>&1
+}
+
 scan_plugins() {
     [ "$IS_USER_TREE" = 1 ] || return 0
     local ip_file="$USER_TREE/plugins/installed_plugins.json"
@@ -89,6 +108,9 @@ scan_plugins() {
             # Accept .mcp.json / skills/ / commands/ / agents/ as manifest-equivalent
             # evidence the plugin defines capabilities; only flag a truly empty install.
             if [ -f "$ip/.mcp.json" ] || [ -d "$ip/skills" ] || [ -d "$ip/commands" ] || [ -d "$ip/agents" ]; then
+                continue
+            fi
+            if _marketplace_declares_capabilities "$key"; then
                 continue
             fi
             emit_finding 2 "PLUGIN-MISSING-MANIFEST" "$key" "no plugin.json or capability dir under $ip"

@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "plugins": {
+    "typescript-lsp@demo-market": [
+      {
+        "scope": "user",
+        "installPath": "__HOME__/.claude/plugins/cache/demo-market/typescript-lsp/1.0.0",
+        "version": "1.0.0"
+      }
+    ]
+  }
+}

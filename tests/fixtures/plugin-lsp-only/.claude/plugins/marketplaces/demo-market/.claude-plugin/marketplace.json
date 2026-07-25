@@ -1,0 +1,20 @@
+{
+  "name": "demo-market",
+  "owner": { "name": "Demo" },
+  "plugins": [
+    {
+      "name": "typescript-lsp",
+      "description": "TypeScript/JavaScript language server for enhanced code intelligence",
+      "version": "1.0.0",
+      "source": "./plugins/typescript-lsp",
+      "strict": false,
+      "lspServers": {
+        "typescript": {
+          "command": "typescript-language-server",
+          "args": ["--stdio"],
+          "extensionToLanguage": { ".ts": "typescript" }
+        }
+      }
+    }
+  ]
+}

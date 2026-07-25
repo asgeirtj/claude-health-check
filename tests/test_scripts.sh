@@ -47,6 +47,11 @@ for f in "$EVALS"/*.json; do
     if [ "$needs_home" = "true" ]; then
         mkdir -p "$tmp/home/.claude"
         cp -r "$REPO/$dir/.claude/." "$tmp/home/.claude/"
+        # installed_plugins.json carries absolute installPaths, which a fixture cannot
+        # know ahead of the temp copy. Fixtures write the literal token __HOME__ and we
+        # expand it here so a case can point at a real directory inside the fake HOME.
+        [ -f "$tmp/home/.claude/plugins/installed_plugins.json" ] &&
+            sed -i "s|__HOME__|$tmp/home|g" "$tmp/home/.claude/plugins/installed_plugins.json"
         target="$tmp/home/.claude"
         run_env=(env "HOME=$tmp/home" "CLAUDE_PLUGIN_DATA=$cache")
     else
