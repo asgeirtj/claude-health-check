@@ -2,7 +2,7 @@
 
 Loaded by `/claude-markdown-health-check` as **step 1 of the Pre-print pass**
 (before tag-canon enforcement). Filters the JUDGMENT findings — the ones the LLM
-phases reason out (Phases 6, 8, 12, 14, 17, 18, 19, 20) — so the report carries only
+phases reason out (Phases 6, 8, 12, 14, 17, 18, 19, 20, 27) — so the report carries only
 findings provable from a concrete artifact. Deterministic / script-relayed
 findings skip this gate entirely.
 
@@ -59,7 +59,8 @@ script-owned — the orchestrator only relays them; never re-ground them here:
 `CHAINED-REF`, `NO-PROGRESSIVE-DISCLOSURE`, `THIRD-PERSON`,
 `UNKNOWN-FRONTMATTER-FIELD`, `EMBEDDED-SECRET`, `UNFLAGGED-DESTRUCTIVE`,
 `SETTINGS-BYPASS-MODE`, `SETTINGS-MCP-AUTOAPPROVE`, `CLAUDEMD-DEAD-SCRIPT`,
-`MODEL-NOT-AVAILABLE`,
+`MODEL-NOT-AVAILABLE`, `OVER-CONSTRAINED`, `INSTRUCTION-DUPLICATED`,
+`CLAUDEMD-OBVIOUS`, `CLAUDEMD-MEMORY-DRIFT`,
 `MEMORY-STALE-CONTENT` (only the deterministic slice — a memory body citing a
 missing `.claude/…` path; the judgment behaviour-contradiction slice below is
 verified, not fast-pathed), `STALE-THRESHOLD`, `GUIDANCE-FETCH-FAILED`.
@@ -97,8 +98,7 @@ re-grepped and saw it — not that it seems true.
 | `UNDER-TRIGGER` | 8 | Name the concrete case the skill handles (cite the SKILL.md line) that the CLAUDE.md "Skills" table omits. Both sides quoted. |
 | `OVER-TRIGGER` | 8 | Quote the CLAUDE.md trigger AND show the SKILL.md does NOT cover it (grep of the body returns nothing for that capability). |
 | `NEEDS-REFERENCES` | 8 | Cite the SKILL.md line count (> `skillMd.maxLines × 0.6`) AND confirm `skills/<name>/references/` is absent/empty. Two facts, both checked. |
-| `NO-EXAMPLES` | 8 | Grep the SKILL.md for an "Examples"/`User says:` section and show zero hits. |
-| `NO-TROUBLESHOOTING` | 8 | Grep the SKILL.md for "Common Issues"/"Troubleshooting" and show zero hits. |
+| `RULE-CONFLICT` | 27 | Quote BOTH directives — each with its file and line — and state the request they would answer differently. One side quoted, or two directives on different topics, is not this tag. Emphasis differences ("prefer X" vs "X unless Y") are not conflicts. |
 | `BURIED-CRITICAL` | 8 | Cite the line number (> 50) where the critical instruction sits AND quote it so "critical" is self-evident. |
 | `ORPHAN-GUIDE` | 17 | Show the inbound grep across CLAUDE.md + settings.json + every SKILL.md/`references/` found ZERO references to the file basename, AND the file exists under `documentation/guides/`. Zero-inbound is the proof; assert it from the grep, not from "looks unused". |
 | `ORPHAN-PATTERN` | 17 | Same as `ORPHAN-GUIDE`, scoped to `patterns/`. |

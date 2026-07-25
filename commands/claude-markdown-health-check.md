@@ -16,6 +16,7 @@ if [[ -d "$PWD/.claude" ]]; then PROJECT_DIR="$PWD/.claude"; fi
 
 - `USER_DIR` is always audited.
 - `PROJECT_DIR` is audited if it exists.
+- Every `references/*.md` this command names resolves the same way — first that exists of `${CLAUDE_PLUGIN_ROOT}/commands/claude-markdown-health-check/references/<name>`, `~/.claude/claude-markdown-health-check/references/<name>`, then the repo copy. Stated once here; the phases just name the file.
 - Findings MUST be prefixed `[user]` or `[project]` so the user knows which tree the issue is in.
 - Phase 5 runs `validate-skills.sh` once per scope. Phase 2/7/11/15/16/19/20/22/23 read the cached scan outputs.
 
@@ -117,8 +118,8 @@ HOOKS=$(ls "$USER_DIR"/hooks/*.sh ${PROJECT_DIR:+"$PROJECT_DIR"/hooks/*.sh} 2>/d
 | Depth | Trigger | Phases |
 |-------|---------|--------|
 | Quick | user said `quick`, OR `$SKILLS<10 && $HOOKS<5` | 1, 5, 6, 10, 21, 24, 25 + spot-check 3 highest-risk skills |
-| Standard | default | 1–18, 20, 24, 25 |
-| Deep | user said `deep` / `comprehensive`, OR `$SKILLS>20` | 1–25 (full) |
+| Standard | default | 1–18, 20, 24, 25, 27 |
+| Deep | user said `deep` / `comprehensive`, OR `$SKILLS>20` | 1–27 (full) |
 
 `--window-days=N` overrides the 30-day default used by Phases 7, 9, 15, 16, 19, 22, 23. When no `quick`/`deep` arg is given, the `depth` config key (`config-keys.md`) sets the floor; `SKIP_PHASES` (config) then removes any listed phases from the selected set — except Phase 5, which always runs.
 
@@ -159,11 +160,11 @@ bash "$VALIDATE" "$USER_DIR"
 [[ -n "$PROJECT_DIR" ]] && bash "$VALIDATE" "$PROJECT_DIR"
 ```
 
-This is the deterministic layer. Trust its output for: name regex, reserved words, name/dir mismatch, missing descriptions, voice violations, line counts, chained references, dead links (skill `references/*.md`, settings `guides`, CLAUDE.md `.claude/…` paths), JSON validity, duplicate keys and array entries, MCP pre-approval, unregistered hooks, hook timeouts, memory-index size, rule scoping, TOC presence, description sizes, frontmatter schema (description min length, `model` whitelist, `allowed-tools` syntax), unknown frontmatter fields, name collisions between `commands/` and `skills/`, embedded credentials in skill/reference markdown (`EMBEDDED-SECRET`), and destructive shell commands without nearby warning markers (`UNFLAGGED-DESTRUCTIVE`). Later phases MUST NOT re-check anything this script already covers — they MUST only handle what the script can't.
+This is the deterministic layer. Trust its output for: name regex, reserved words, name/dir mismatch, missing descriptions, voice violations, line counts, chained references, dead links (skill `references/*.md`, settings `guides`, CLAUDE.md `.claude/…` paths), JSON validity, duplicate keys and array entries, MCP pre-approval, unregistered hooks, hook timeouts, memory-index size, rule scoping, TOC presence, description sizes, frontmatter schema (description min length, `model` whitelist, `allowed-tools` syntax), unknown frontmatter fields, name collisions between `commands/` and `skills/`, embedded credentials in skill/reference markdown (`EMBEDDED-SECRET`), destructive shell commands without nearby warning markers (`UNFLAGGED-DESTRUCTIVE`), and the context-engineering set relayed by Phases 12 and 27 (`OVER-CONSTRAINED`, `INSTRUCTION-DUPLICATED`, `CLAUDEMD-OBVIOUS`, `CLAUDEMD-MEMORY-DRIFT`). Later phases MUST NOT re-check anything this script already covers — they MUST only handle what the script can't.
 
 ## Phase 6 — Skill Listing Budget
 
-Audits whether the cumulative skill-listing block fits Claude Code's runtime budget. Emits `SKILL-BUDGET-OVERFLOW` (Critical) plus `SKILL-LOW-RELEVANCE` and `SKILL-DUPLICATE-DOMAIN` (Structural). See `skill-listing-budget.md` for the full logic, the `validate-skills.sh --listing-cost` invocation, and the remediation order. Resolution: first that exists of `${CLAUDE_PLUGIN_ROOT}/commands/claude-markdown-health-check/references/skill-listing-budget.md`, `~/.claude/claude-markdown-health-check/references/skill-listing-budget.md`, or the repo copy.
+Audits whether the cumulative skill-listing block fits Claude Code's runtime budget. Emits `SKILL-BUDGET-OVERFLOW` (Critical) plus `SKILL-LOW-RELEVANCE` and `SKILL-DUPLICATE-DOMAIN` (Structural). See `skill-listing-budget.md` for the full logic, the `validate-skills.sh --listing-cost` invocation, and the remediation order.
 
 ## Phase 7 — Skill Usage Metrics
 
@@ -188,9 +189,8 @@ For each skill under `$USER_DIR/skills/*/SKILL.md` AND `$PROJECT_DIR/skills/*/SK
 
 **Structure quality**
 - SKILL.md > `skillMd.maxLines × 0.6` lines AND no `references/` subdir → `NEEDS-REFERENCES`
-- SKILL.md MUST have an "Examples" section with `User says:` scenarios — missing → `NO-EXAMPLES`
-- SKILL.md MUST have a "Common Issues" or troubleshooting section — missing → `NO-TROUBLESHOOTING`
 - Critical instructions buried below line 50 → `BURIED-CRITICAL`
+- A missing "Examples" or "Troubleshooting" section is NOT a finding. Worked examples pin the model to the shape they show; a skill earns its place through an expressive interface (clear parameters, named states, honest tool descriptions), not through sample transcripts. Flag a thin skill on what it fails to say, never on a section it omits.
 
 **Resolvability**
 - `validate-skills.sh` already resolves every `references/*.md` path a SKILL.md cites — relay its `DEAD-REF` lines, do NOT re-scan.
@@ -218,6 +218,8 @@ This phase judges whether each CLAUDE.md / `CLAUDE.local.md` in scope is actuall
 Then compute the **per-file CLAUDE.md score** (always-on; see the rubric in `claude-md-quality.md`) from the surviving findings and render it per `report-format.md`.
 
 Skip at Quick depth. A short but accurate CLAUDE.md is not a finding.
+
+Two more judgment-free relays land here from Phase 5, both from the Claude 5 context-engineering guidance: a block of ≥6 consecutive bare path lines whose entries resolve on disk → `CLAUDEMD-OBVIOUS` (the file tree is one tool call away; the budget belongs to the gotchas), and ≥3 memory-shaped bullets — "Remember …", "The user prefers …", anything under a *Notes to self* / *Memories* heading → `CLAUDEMD-MEMORY-DRIFT` (auto-memory owns those now, and keeps them out of every-turn context). An annotated architecture map, where each entry carries a relationship or a quirk, is not a listing — it is exactly what the file should hold.
 
 Deterministic CLAUDE.md checks run inside `validate-skills.sh` (Phase 5) and relay here: a `npm run <script>` mention (in CLAUDE.md, `CLAUDE.local.md`, or a `documentation/guides/*.md` it routes to) whose `<script>` is defined in no `package.json` from the file up to the repo root → `CLAUDEMD-DEAD-SCRIPT`; an `@path` import that does not resolve → `CLAUDEMD-DEAD-IMPORT`; an `@import` chain deeper than the 4-hop limit → `IMPORT-TOO-DEEP`; a `CLAUDE.local.md` inside a git repo with no covering `.gitignore` entry → `LOCAL-MD-TRACKED`. See `claude-md-quality.md`.
 
@@ -333,6 +335,13 @@ jq -r '.findings[] | select(.phase == 26)' "$GRAPH"
 
 See `output-styles.md` for the tag definition: `OUTPUTSTYLE-MISSING` (Critical — `outputStyle` names a non-existent, non-built-in style). Built-in styles (`Default`, `Proactive`, `Explanatory`, `Learning`) have no file and are never flagged (matched case-insensitively). There is no "orphan style" tag — unselected style files are a legitimate palette, not a defect.
 
+## Phase 27 — Context Coherence
+
+Judges the assembled context — CLAUDE.md and its imports, skills, commands, rules, output styles — as the single document the model actually reads. Standard + Deep. See `context-coherence.md` for thresholds, calibration, and remediation.
+
+- `OVER-CONSTRAINED` (Hygiene) and `INSTRUCTION-DUPLICATED` (Hygiene) relay from Phase 5 — deterministic, no re-checking.
+- `RULE-CONFLICT` (Structural) is the judgment check: two directives a single request cannot satisfy at once. It survives the Pre-print grounding gate only with both sides quoted, file and line each.
+
 ## Phase 24 — Report
 
 ### Quick Report (Quick depth only)
@@ -355,8 +364,7 @@ See `output-styles.md` for the tag definition: `OUTPUTSTYLE-MISSING` (Critical �
 Render per `references/report-format.md`: a scorecard, then findings grouped by
 DOMAIN (not by severity tier), each a plain-language sentence with a
 `🔴 must-fix`/`🟠 should`/`🟡 polish` chip and the tag trailing as a machine code.
-Resolve the spec file the same way as `post-report-menu.md`. One scorecard +
-grouped block per scope present.
+One scorecard + grouped block per scope present.
 
 ```
 ## .claude health (<scope>) — grade <A|B|C|D>
@@ -398,7 +406,7 @@ Tool calls: X (Y% ok) | Reworks: Z | Corrections: W | Builds: V/N
 issues: Skills 3 · Hooks 1 · Settings & Permissions 1
 
 ## Skills
- 1. 🔴 must-fix atlassian links to a missing file (references/api.md)
+ 1. 🔴 must-fix atlassian links to a missing file (skills/atlassian/references/api.md)
                skills/atlassian/SKILL.md                          · DEAD-REF
  2. 🟠 should   atlassian body is 412 lines with no references/ split
                skills/atlassian/SKILL.md                   · NEEDS-REFERENCES
@@ -420,10 +428,10 @@ issues: Skills 3 · Hooks 1 · Settings & Permissions 1
 `DEAD-REF`, `DUPLICATE-KEY`, `INVALID-JSON`, `MISSING-DESC`, `DEAD-MATCHER`, `UNREGISTERED-HOOK`, `MISSING-PRE-APPROVED`, `MEMORY-OVERFLOW`, `SKILL-BUDGET-OVERFLOW`, `STALE-THRESHOLD`, `GUIDANCE-FETCH-FAILED`, `BAD-FRONTMATTER-SCHEMA`, `NAME-COLLISION`, `SKILL-ORPHAN`, `MISSING-SKILL-GAP`, `PLUGIN-BROKEN-REF`, `PLUGIN-MISSING-MANIFEST`, `MEMORY-DEAD-LINK`, `REF-CIRCULAR`, `HOOK-FAILING`, `EMBEDDED-SECRET`, `BAD-NAME`, `RESERVED-NAME`, `OUTPUTSTYLE-MISSING`, `SETTINGS-BYPASS-MODE`, `AGENT-BAD-SCHEMA`, `AGENT-BYPASS-PERMS`, `PLUGIN-MISPLACED-DIR`, `MARKETPLACE-DEAD-SOURCE`, `CLAUDEMD-DEAD-IMPORT`, `CLAUDEMD-DEAD-SCRIPT`
 
 **Structural** (works but should be reorganised)
-`UNDER-TRIGGER`, `OVER-TRIGGER`, `MISSING-TRIGGER`, `MISSING-AGENT-TRIGGER`, `OVERLAPPING-AGENT`, `DUPLICATE-LOGIC`, `MISSING-ENFORCEMENT`, `NEEDS-REFERENCES`, `NO-EXAMPLES`, `NO-TROUBLESHOOTING`, `BURIED-CRITICAL`, `WEAK-DESC`, `NAME-MISMATCH`, `BAD-RULE-FRONTMATTER`, `ORPHAN-GUIDE`, `ORPHAN-PATTERN`, `REPURPOSE`, `SKILL-LOW-RELEVANCE`, `SKILL-DUPLICATE-DOMAIN`, `CLAUDEMD-STALE`, `CLAUDEMD-GENERIC`, `CLAUDEMD-THIN`, `SKILL-NEVER-FIRED`, `SKILL-DORMANT`, `SKILL-MISFIRING`, `RECURRING-DENIAL`, `SKILL-TOOL-UNDECLARED`, `HOOK-EVENT-MISMATCH`, `AGENT-NEVER-SPAWNED`, `AGENT-DUP-NAME`, `AGENT-PLUGIN-FORBIDDEN-FIELD`, `HOOK-EXIT-NONBLOCKING`, `HOOK-UNSAFE-SHELL`, `HOOK-ENV-LEAK`, `REF-TOO-DEEP`, `CONTEXT-BLOAT`, `PLUGIN-VERSION-DRIFT`, `PLUGIN-BAD-VERSION`, `PLUGIN-ABS-PATH`, `MCP-BAD-DEF`, `MODEL-NOT-AVAILABLE`, `IMPORT-TOO-DEEP`, `DESCRIPTION-TOO-LONG`, `OVER-500-LINES`, `CHAINED-REF`, `NO-PROGRESSIVE-DISCLOSURE`, `DESCRIPTION-TRUNCATED`, `MEMORY-STALE-CONTENT`
+`UNDER-TRIGGER`, `OVER-TRIGGER`, `MISSING-TRIGGER`, `MISSING-AGENT-TRIGGER`, `OVERLAPPING-AGENT`, `DUPLICATE-LOGIC`, `MISSING-ENFORCEMENT`, `NEEDS-REFERENCES`, `RULE-CONFLICT`, `BURIED-CRITICAL`, `WEAK-DESC`, `NAME-MISMATCH`, `BAD-RULE-FRONTMATTER`, `ORPHAN-GUIDE`, `ORPHAN-PATTERN`, `REPURPOSE`, `SKILL-LOW-RELEVANCE`, `SKILL-DUPLICATE-DOMAIN`, `CLAUDEMD-STALE`, `CLAUDEMD-GENERIC`, `CLAUDEMD-THIN`, `SKILL-NEVER-FIRED`, `SKILL-DORMANT`, `SKILL-MISFIRING`, `RECURRING-DENIAL`, `SKILL-TOOL-UNDECLARED`, `HOOK-EVENT-MISMATCH`, `AGENT-NEVER-SPAWNED`, `AGENT-DUP-NAME`, `AGENT-PLUGIN-FORBIDDEN-FIELD`, `HOOK-EXIT-NONBLOCKING`, `HOOK-UNSAFE-SHELL`, `HOOK-ENV-LEAK`, `REF-TOO-DEEP`, `CONTEXT-BLOAT`, `PLUGIN-VERSION-DRIFT`, `PLUGIN-BAD-VERSION`, `PLUGIN-ABS-PATH`, `MCP-BAD-DEF`, `MODEL-NOT-AVAILABLE`, `IMPORT-TOO-DEEP`, `DESCRIPTION-TOO-LONG`, `OVER-500-LINES`, `CHAINED-REF`, `NO-PROGRESSIVE-DISCLOSURE`, `DESCRIPTION-TRUNCATED`, `MEMORY-STALE-CONTENT`
 
 **Hygiene** (cosmetic / token efficiency)
-`BROAD-PATTERN`, `SUSPICIOUS-TIMEOUT`, `STALE-REMINDER`, `DUPLICATE-ENTRY`, `RULE-OVERSIZED`, `BODY-FILLER-HIGH`, `BODY-COMPRESSED`, `BODY-COMPRESSION-REJECTED`, `UNKNOWN-FRONTMATTER-FIELD`, `RECURRING-CORRECTION`, `SKILL-TOOL-UNUSED`, `PERM-DEAD-ENTRY`, `PERM-OVERBROAD`, `HOOK-NEVER-FIRED`, `REF-ORPHAN`, `MEMORY-ORPHAN-FILE`, `MEMORY-DUP-ENTRY`, `MEMORY-STALE-DATE`, `LOW-CACHE-HIT`, `UNFLAGGED-DESTRUCTIVE`, `THIRD-PERSON`, `MISSING-TOC`, `MCP-DEPRECATED-TRANSPORT`, `MCP-PLAINTEXT-SECRET`, `SETTINGS-MCP-AUTOAPPROVE`, `HOOK-NO-SHEBANG`, `LOCAL-MD-TRACKED`, `PLUGIN-DISABLED`
+`BROAD-PATTERN`, `SUSPICIOUS-TIMEOUT`, `STALE-REMINDER`, `DUPLICATE-ENTRY`, `RULE-OVERSIZED`, `BODY-FILLER-HIGH`, `BODY-COMPRESSED`, `BODY-COMPRESSION-REJECTED`, `UNKNOWN-FRONTMATTER-FIELD`, `RECURRING-CORRECTION`, `SKILL-TOOL-UNUSED`, `PERM-DEAD-ENTRY`, `PERM-OVERBROAD`, `HOOK-NEVER-FIRED`, `REF-ORPHAN`, `MEMORY-ORPHAN-FILE`, `MEMORY-DUP-ENTRY`, `MEMORY-STALE-DATE`, `LOW-CACHE-HIT`, `UNFLAGGED-DESTRUCTIVE`, `THIRD-PERSON`, `MISSING-TOC`, `MCP-DEPRECATED-TRANSPORT`, `MCP-PLAINTEXT-SECRET`, `SETTINGS-MCP-AUTOAPPROVE`, `HOOK-NO-SHEBANG`, `LOCAL-MD-TRACKED`, `PLUGIN-DISABLED`, `OVER-CONSTRAINED`, `INSTRUCTION-DUPLICATED`, `CLAUDEMD-OBVIOUS`, `CLAUDEMD-MEMORY-DRIFT`
 
 **Discovery** (from Phase 4, additive only)
 `NEW-RULE`, `NEW-PATTERN`, `NEW-TRIGGER`, `NEW-REFERENCE`, `SKILL-UPDATE`
@@ -432,8 +440,8 @@ issues: Skills 3 · Hooks 1 · Settings & Permissions 1
 
 ## Output Rules
 
-- Render per `references/report-format.md`: a scorecard line, then findings grouped by DOMAIN (fixed order, omit empty domains), each a plain-language sentence with a `🔴 must-fix`/`🟠 should`/`🟡 polish` chip and the tag trailing as ` · TAG`.
-- Scope is conveyed by a per-scope block header `## .claude health (user|project) — grade X`. Print one scorecard + grouped block per scope present. Do NOT prefix each finding line with the scope.
+- Rendering is Phase 24's job (`references/report-format.md`) — it is not restated here.
+- Scope is conveyed by the per-scope block header `## .claude health (user|project) — grade X`; do NOT prefix each finding line with the scope.
 - Number findings 1…N globally in reading order (domain order, then chip severity within a domain) so the Phase 25 menu can reference "finding N" and "all must-fix".
 - Empty domains and empty summary blocks MUST be omitted
 - Output MUST NOT contain XML tags
@@ -442,7 +450,7 @@ issues: Skills 3 · Hooks 1 · Settings & Permissions 1
 
 ## Pre-print pass — Verify, Ground & Self-check (MANDATORY before printing the report)
 
-1. **Evidence-grounding gate (verify judgment findings).** Run every JUDGMENT finding through `finding-verification.md` BEFORE the checks below — it can drop or downgrade findings, so the later checks must operate on the final set. Deterministic / script-relayed findings (the `validate-skills.sh`, `scan-graph.sh`, and `scan-history.sh` tags listed in that doc) take the skip-verification fast path — they are already proof-backed and are NOT re-verified. For each surviving judgment finding, either attach an `Evidence:` locator (grounded), downgrade it to `[OBSERVATION]` (plausible but ungrounded), or drop it (disproven). Honour the `verifyFindings` config (default on); skip only when explicitly disabled. Resolve the spec the same way as `post-report-menu.md`: first that exists of `${CLAUDE_PLUGIN_ROOT}/commands/claude-markdown-health-check/references/finding-verification.md`, `~/.claude/claude-markdown-health-check/references/finding-verification.md`, or the repo copy.
+1. **Evidence-grounding gate (verify judgment findings).** Run every JUDGMENT finding through `finding-verification.md` BEFORE the checks below — it can drop or downgrade findings, so the later checks must operate on the final set. Deterministic / script-relayed findings (the `validate-skills.sh`, `scan-graph.sh`, and `scan-history.sh` tags listed in that doc) take the skip-verification fast path — they are already proof-backed and are NOT re-verified. For each surviving judgment finding, either attach an `Evidence:` locator (grounded), downgrade it to `[OBSERVATION]` (plausible but ungrounded), or drop it (disproven). Honour the `verifyFindings` config (default on); skip only when explicitly disabled.
 2. **Tag canon enforcement** — every `[TAG]` in the draft MUST appear in the Tag Set above. For any tag that does not:
    - Relabel to the closest canonical tag
    - If no canonical tag fits, drop the finding rather than invent a new tag
@@ -454,6 +462,6 @@ Only after this self-check passes, print the report to chat.
 
 ## Phase 25 — Post-Report Menu
 
-After the report prints, present an action menu instead of waiting passively. Read `post-report-menu.md` for menu options, apply rules, guardrails, and loop. Resolution: first that exists of `${CLAUDE_PLUGIN_ROOT}/commands/claude-markdown-health-check/references/post-report-menu.md`, `~/.claude/claude-markdown-health-check/references/post-report-menu.md`, or the repo copy.
+After the report prints, present an action menu instead of waiting passively. Read `post-report-menu.md` for menu options, apply rules, guardrails, and loop.
 
 Skip the menu only when the report has zero actionable findings — print a one-line all-clear and stop.

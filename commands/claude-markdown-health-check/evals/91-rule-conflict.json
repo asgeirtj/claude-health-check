@@ -1,0 +1,23 @@
+{
+  "id": "91-rule-conflict",
+  "command": "claude-markdown-health-check",
+  "fixture": {
+    "kind": "claude-tree",
+    "dir": "tests/fixtures/rule-conflict",
+    "needs_home_override": false,
+    "scanners": ["validate-skills"]
+  },
+  "grader": { "method": "llm-rubric" },
+  "query": "/claude-markdown-health-check",
+  "grader_rubric": "PASS only if the report contains a RULE-CONFLICT finding that quotes BOTH sides of the contradiction — the CLAUDE.md line forbidding comments AND the documenter skill line requiring a doc comment on every exported function — and names both files. FAIL if the conflict is missed, if only one side is quoted, if it is reported without evidence, or if any file was written. Last line: PASS or FAIL.",
+  "expected_behavior": [
+    "Phase 27 flags the contradiction between 'Never add comments' (CLAUDE.md) and 'Always add a doc comment to every exported function' (skills/documenter/SKILL.md)",
+    "the finding carries an Evidence: locator quoting both lines with their files",
+    "no file in the fixture tree is modified"
+  ],
+  "expected_not_behavior": [
+    "flagging a conflict between two directives that address different topics",
+    "flagging either directive on its own as over-constrained"
+  ],
+  "assert_no_writes": true
+}

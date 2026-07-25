@@ -93,6 +93,14 @@ report prints. These `llm-rubric` cases cover it from both directions:
   locator quoting the description; `39` asserts an ungrounded-but-plausible trigger
   concern is downgraded to `[OBSERVATION]` rather than emitted as a tagged finding.
 
+**Context-engineering cases (86–91).** The Claude 5 context-engineering checks come with
+their own paired guard: `86`–`89` plant one defect each (over-constrained skill prose, a
+directive duplicated across CLAUDE.md and a skill, a file-tree dump, session facts parked
+in CLAUDE.md), while `90` is the false-positive counterpart — an annotated architecture
+map, two memory bullets (under the floor), and a paraphrased shared directive must all
+stay silent. `91` is the `llm-rubric` case for `RULE-CONFLICT`, the one judgment tag in
+that set.
+
 **History phases (`scan-history.sh`).** The phases that read session telemetry
 (skill dormancy/usage, skill–tool contract, hook reliability, token trend,
 cross-session, agent spawns) are covered by the **`synthetic-jsonl`** fixture

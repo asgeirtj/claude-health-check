@@ -84,6 +84,21 @@ AGENT_COLOR_RE='^(red|blue|green|yellow|purple|orange|pink|cyan)$'
 AGENT_PERMMODE_RE='^(default|acceptEdits|auto|dontAsk|bypassPermissions|plan)$'
 # Fields a PLUGIN-provided subagent declares in vain — Claude Code silently ignores them.
 AGENT_PLUGIN_FORBIDDEN=("hooks" "mcpServers" "permissionMode")
+# Context-engineering thresholds — see
+# https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models
+# ("we were overconstraining Claude Code", "delete these repeat examples").
+# Only ALL-CAPS absolutes count: a lowercase "must" in prose is normal English,
+# a shouted one is a hard rule. Calibrated on real trees — ordinary skills land at
+# 0–8 hits per 100 body lines, an "ABSOLUTE RULE"-style CLAUDE.md at 18.
+ABSOLUTE_DIRECTIVE_RE="\b(NEVER|ALWAYS|MUST NOT|MUST|DO NOT|DON'T|MANDATORY|STRICTLY FORBIDDEN|ABSOLUTE)\b"
+OVERCONSTRAINT_MIN_BODY=40
+OVERCONSTRAINT_MIN_HITS=8
+OVERCONSTRAINT_PER_100=12
+DUPLICATED_INSTRUCTION_MIN_CHARS=40
+OBVIOUS_LISTING_MIN_LINES=6
+OBVIOUS_LISTING_MIN_RESOLVED=3
+MEMORY_DRIFT_MIN_BULLETS=3
+
 # Auto-memory index budget (loaded slice) and hook-timeout defaults (seconds).
 MEMORY_MAX_LINES=200
 MEMORY_MAX_BYTES=25600
@@ -306,6 +321,7 @@ validate_skill_md() {
 
     check_embedded_secrets      "$skill_file" "$skill_name"
     check_unflagged_destructive "$skill_file" "$skill_name"
+    check_over_constrained      "$skill_file" "$skill_name"
 }
 
 validate_agent_md() {
@@ -573,6 +589,9 @@ walk_imports() {
         fi
         case "$_imports_visited" in *"|$resolved|"*) continue ;; esac
         _imports_visited="$_imports_visited|$resolved|"
+        # An imported file is loaded every turn just like its importer, so it is
+        # held to the same context-engineering budget.
+        case "$resolved" in *.md) check_over_constrained "$resolved" "@$tok" ;; esac
         walk_imports "$resolved" "@$tok" $((depth + 1))
     done < <(_extract_imports "$file")
 }
@@ -870,6 +889,177 @@ check_unflagged_destructive() {
     ' "$file" 2>/dev/null || true)
 }
 
+# Print a markdown file's body: frontmatter and fenced code blocks removed, so
+# prose metrics are not skewed by YAML keys or shell samples.
+_body_stream() {
+    awk '
+        NR == 1 && /^---[[:space:]]*$/ { fm = 1; next }
+        fm { if (/^---[[:space:]]*$/) fm = 0; next }
+        /^[[:space:]]*```/ { fence = !fence; next }
+        fence { next }
+        { print }
+    ' "$1" 2>/dev/null
+}
+
+# Flag instruction files whose prose is mostly hard rules. Newer models resolve
+# intent from context; a wall of shouted absolutes forces them to arbitrate
+# conflicting constraints before working, and the guardrails that once earned
+# their tokens now cost quality.
+check_over_constrained() {
+    local file="$1" display="$2" body_lines hits per100
+    [ -f "$file" ] || return 0
+    body_lines=$(_body_stream "$file" | grep -c '' || true)
+    if [ "${body_lines:-0}" -lt "$OVERCONSTRAINT_MIN_BODY" ]; then
+        return 0
+    fi
+    hits=$(_body_stream "$file" | grep -oE "$ABSOLUTE_DIRECTIVE_RE" | grep -c '' || true)
+    if [ "${hits:-0}" -lt "$OVERCONSTRAINT_MIN_HITS" ]; then
+        return 0
+    fi
+    per100=$(( hits * 100 / body_lines ))
+    if [ "$per100" -ge "$OVERCONSTRAINT_PER_100" ]; then
+        warning "[OVER-CONSTRAINED] $display: $hits absolute directives over $body_lines body lines ($per100 per 100) — let the model use judgement; keep hard rules for the safety-critical few"
+    fi
+}
+
+# Print the normalized directive lines of a markdown file: lowercased, list
+# markers / emphasis / trailing punctuation stripped, short lines and
+# non-instructions dropped. Two files carrying the same normalized line are
+# stating the same rule twice.
+_directive_lines() {
+    _body_stream "$1" | awk -v min="$DUPLICATED_INSTRUCTION_MIN_CHARS" '
+        {
+            s = tolower($0)
+            sub(/^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]*/, "", s)
+            sub(/^[[:space:]]*#+[[:space:]]*/, "", s)
+            gsub(/[`*_>]/, "", s)
+            gsub(/[[:space:]]+/, " ", s)
+            sub(/^ /, "", s); sub(/ $/, "", s)
+            sub(/[.;:,!]+$/, "", s)
+            if (length(s) < min) next
+            if (s !~ /(^| )(must|never|always|do not|don.t|required|forbidden|prohibited)( |$)/) next
+            print s
+        }
+    ' | sort -u
+}
+
+# Flag a directive stated verbatim in more than one context file. Repetition was
+# a workaround for older models weighting the end of the context window; today it
+# just spends tokens twice and drifts when only one copy is updated.
+check_instruction_duplication() {
+    local tmp f disp line n where snippet
+    tmp=$(mktemp) || return 0
+    for f in "$CLAUDE_MD" "$CLAUDE_DIR/CLAUDE.local.md" "$CLAUDE_DIR/../CLAUDE.local.md" \
+             "$CLAUDE_DIR"/rules/*.md "$SKILLS_DIR"/*/SKILL.md "$COMMANDS_DIR"/*.md; do
+        [ -f "$f" ] || continue
+        case "$f" in
+            "$CLAUDE_DIR/../"*) disp=$(basename "$f") ;;
+            "$CLAUDE_DIR/"*)    disp=${f#"$CLAUDE_DIR"/} ;;
+            *)                  disp=$(basename "$f") ;;
+        esac
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            printf '%s\t%s\n' "$line" "$disp" >> "$tmp"
+        done < <(_directive_lines "$f")
+    done
+    while IFS=$'\t' read -r n where snippet; do
+        [ -z "$n" ] && continue
+        [ "${#snippet}" -gt 60 ] && snippet="${snippet:0:57}..."
+        warning "[INSTRUCTION-DUPLICATED] $where: same directive stated in $n files — \"$snippet\" — say it once, in the file that owns the topic"
+    done < <(awk -F'\t' '
+        !seen[$1 SUBSEP $2]++ {
+            n[$1]++
+            where[$1] = (where[$1] == "" ? $2 : where[$1] " + " $2)
+        }
+        END { for (k in n) if (n[k] > 1) printf "%d\t%s\t%s\n", n[k], where[k], k }
+    ' "$tmp" 2>/dev/null | sort -rn | head -5 || true)
+    rm -f "$tmp"
+}
+
+# Flag a CLAUDE.md block that just lists the file tree. A directory dump is
+# something a session reads off the file system in one call; the context budget
+# is better spent on the gotchas it cannot infer.
+check_claudemd_obvious() {
+    local file="$1" display="$2" root names start count toks tok matched
+    [ -f "$file" ] || return 0
+    root=$(dirname "$file")
+    names=""
+    while IFS=$'\t' read -r start count toks; do
+        [ -z "$start" ] && continue
+        if [ -z "$names" ]; then
+            names=$(find "$root" -maxdepth 3 -name .git -prune -o -print 2>/dev/null \
+                    | awk -F/ '{ print $NF }' | sort -u || true)
+        fi
+        matched=0
+        for tok in $toks; do
+            tok="${tok%/}"
+            if [ -e "$root/$tok" ] || printf '%s\n' "$names" | grep -qxF "$tok"; then
+                matched=$((matched + 1))
+            fi
+        done
+        if [ "$matched" -ge "$OBVIOUS_LISTING_MIN_RESOLVED" ]; then
+            warning "[CLAUDEMD-OBVIOUS] $display:$start — $count consecutive path lines ($matched resolve on disk); the file tree is already visible to a session, spend the budget on gotchas"
+            return 0
+        fi
+    done < <(awk -v min="$OBVIOUS_LISTING_MIN_LINES" '
+        function flush(   i, s) {
+            if (n >= min) {
+                s = ""
+                for (i = 1; i <= n; i++) s = s (i > 1 ? " " : "") tok[i]
+                printf "%d\t%d\t%s\n", start, n, s
+            }
+            n = 0
+        }
+        NR == 1 && /^---[[:space:]]*$/ { fm = 1; next }
+        fm { if (/^---[[:space:]]*$/) fm = 0; next }
+        {
+            s = $0
+            gsub(/[^ -~]/, " ", s)
+            sub(/^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]*/, "", s)
+            gsub(/[`"'"'"']/, "", s)
+            sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s)
+            if (s ~ /^[A-Za-z0-9._@-]+(\/[A-Za-z0-9._@-]+)*\/?$/ && s ~ /[A-Za-z0-9]/) {
+                if (n == 0) start = NR
+                tok[++n] = s
+                next
+            }
+            flush()
+        }
+        END { flush() }
+    ' "$file" 2>/dev/null || true)
+}
+
+# Flag session facts parked in CLAUDE.md. Auto-memory now owns "what I learned
+# about this user / this run"; the same content in CLAUDE.md reloads every turn
+# and goes stale silently.
+check_claudemd_memory_drift() {
+    local file="$1" display="$2" n first
+    [ -f "$file" ] || return 0
+    IFS=$'\t' read -r n first < <(awk '
+        NR == 1 && /^---[[:space:]]*$/ { fm = 1; next }
+        fm { if (/^---[[:space:]]*$/) fm = 0; next }
+        /^[[:space:]]*```/ { fence = !fence; next }
+        fence { next }
+        /^[[:space:]]*#{1,6}[[:space:]]/ {
+            h = tolower($0)
+            inmem = (h ~ /(memor(y|ies)|notes? to self|learned|session notes)/) ? 1 : 0
+            next
+        }
+        /^[[:space:]]*[-*+][[:space:]]/ {
+            b = tolower($0)
+            sub(/^[[:space:]]*[-*+][[:space:]]*/, "", b)
+            if (inmem || b ~ /^(remember\b|note to self\b|reminder:|(the )?user (prefers|likes|wants|asked|said)\b)/) {
+                n++
+                if (first == 0) first = NR
+            }
+        }
+        END { printf "%d\t%d\n", n, first }
+    ' "$file" 2>/dev/null || true)
+    if [ "${n:-0}" -ge "$MEMORY_DRIFT_MIN_BULLETS" ]; then
+        warning "[CLAUDEMD-MEMORY-DRIFT] $display: $n memory-shaped facts (first at line $first) — auto-memory keeps these out of every-turn context"
+    fi
+}
+
 # Detect basename overlap between skills/ and commands/. Same name in both
 # namespaces shadows in the slash-command UI; skill wins per docs but the
 # duplication is a maintenance trap and worth flagging.
@@ -987,6 +1177,9 @@ if [ -f "$CLAUDE_MD" ]; then
     check_dead_refs_in_file "$CLAUDE_MD" "CLAUDE.md"
     check_npm_scripts_in_file "$CLAUDE_MD" "CLAUDE.md"
     walk_imports "$CLAUDE_MD" "CLAUDE.md" 0
+    check_over_constrained "$CLAUDE_MD" "CLAUDE.md"
+    check_claudemd_obvious "$CLAUDE_MD" "CLAUDE.md"
+    check_claudemd_memory_drift "$CLAUDE_MD" "CLAUDE.md"
 else
     warning "No CLAUDE.md found"
 fi
@@ -996,6 +1189,9 @@ for cl in "$CLAUDE_DIR/CLAUDE.local.md" "$CLAUDE_DIR/../CLAUDE.local.md"; do
     check_dead_refs_in_file "$cl" "$(basename "$cl")"
     check_npm_scripts_in_file "$cl" "$(basename "$cl")"
     walk_imports "$cl" "$(basename "$cl")" 0
+    check_over_constrained "$cl" "$(basename "$cl")"
+    check_claudemd_obvious "$cl" "$(basename "$cl")"
+    check_claudemd_memory_drift "$cl" "$(basename "$cl")"
 done
 # Guides CLAUDE.md routes to — ground their `npm run` mentions the same way.
 if [ -d "$CLAUDE_DIR/documentation/guides" ]; then
@@ -1183,6 +1379,11 @@ echo ""
 # --- Check 9: Name collisions (commands vs skills) ---
 bold "--- Name Collisions ---"
 check_name_collisions
+echo ""
+
+# --- Check 10: Context coherence (repetition across context sources) ---
+bold "--- Context Coherence ---"
+check_instruction_duplication
 echo ""
 
 # --- Summary ---

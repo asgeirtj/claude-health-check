@@ -23,7 +23,8 @@ A scorecard with a letter grade, an always-on per-file CLAUDE.md score, and find
 
 | Area | Examples of findings |
 |---|---|
-| **Skills** | missing or oversized `description`, frontmatter `name` ≠ directory, triggers that don't match real usage, oversized `SKILL.md` with no `references/`, missing Examples / Troubleshooting sections, dead internal paths |
+| **Skills** | missing or oversized `description`, frontmatter `name` ≠ directory, triggers that don't match real usage, oversized `SKILL.md` with no `references/`, dead internal paths |
+| **Context engineering** | prose that is mostly shouted absolutes (`NEVER` / `MUST` / `DO NOT`) where judgement would do, the same directive repeated verbatim across CLAUDE.md and a skill, and directives that contradict each other across files |
 | **Skill-listing budget** | cumulative `description` + `when_to_use` block exceeding Claude Code's 1%-of-context budget; low-relevance and duplicate-domain skills |
 | **Skill usage** | dormant skills (no fires in 30d), never-fired skills, misfiring skills (loaded but no follow-through), orphan ledger entries |
 | **Skill–tool contract** | tools declared in `allowed-tools` but never called, tools called but not declared |
@@ -42,7 +43,7 @@ A scorecard with a letter grade, an always-on per-file CLAUDE.md score, and find
 | **Reference graph** | cycles in `references/*.md`, depth exceeding `MAX_REF_DEPTH`, orphan reference files (in-degree 0) |
 | **Memory** | `MEMORY.md` over the loaded-slice line/byte budget |
 | **Memory hygiene** | dead `- [Title](file.md)` links, orphan files in memory dir, duplicate entries, stale dates (>365d), **stale body content** — a memory citing a path/script/behaviour the current tree contradicts |
-| **CLAUDE.md content** | dead `npm run <script>` (not in any `package.json` from the file up to the repo root), **self-referential count drift** ("all 36 rules" when the file holds 41), stale commands/paths/versions, generic boilerplate, missing build/test/run commands — plus an always-on **per-file 0–100 score** with a criteria breakdown |
+| **CLAUDE.md content** | dead `npm run <script>` (not in any `package.json` from the file up to the repo root), **self-referential count drift** ("all 36 rules" when the file holds 41), stale commands/paths/versions, generic boilerplate, missing build/test/run commands, a file-tree dump the file system already shows, session facts that belong in auto-memory — plus an always-on **per-file 0–100 score** with a criteria breakdown |
 | **CLAUDE.md imports** | dead `@path` imports, `@import` chains past the 4-hop limit, a `CLAUDE.local.md` not covered by `.gitignore` |
 | **Context trend** (Deep depth) | low cache-hit sessions, output bloat per session |
 | **Cross-session patterns** (Deep depth) | recurring tool denials, recurring user corrections, missing skill gaps (subagents repeatedly spawned with no matching skill) |
@@ -166,7 +167,7 @@ Full per-key rationale: [`references/config-keys.md`](commands/claude-markdown-h
 
 ## How it works — phases
 
-The phase sequence runs flat from 1 to 25, renumbered from the previous 5a / 5b / 5.5 / 7a scheme — see the [Migration note](#migration-note) below. Phase 26 (Output Styles) was added later; it runs in the scan band and feeds the Phase 24 report like the other scanners.
+The phase sequence runs flat from 1 to 25, renumbered from the previous 5a / 5b / 5.5 / 7a scheme — see the [Migration note](#migration-note) below. Phases 26 (Output Styles) and 27 (Context Coherence) were added later; both run in the scan band and feed the Phase 24 report like the other scanners.
 
 | Phase | What it does | Depth |
 |---|---|---|
@@ -196,6 +197,7 @@ The phase sequence runs flat from 1 to 25, renumbered from the previous 5a / 5b 
 | 24 — Report | A mandatory pre-print pass first **grounds every judgment finding** (drop / downgrade / keep-with-`Evidence:`), then renders a scorecard + findings grouped by area, each a plain-language line with a must-fix / should / polish chip and a trailing tag code; optional summary blocks per active phase | All |
 | 25 — Post-Report Menu | Pick a fix scope, apply, re-validate, loop until done | All |
 | 26 — Output Styles | `.claude/output-styles/*.md` vs the selected `outputStyle`: flags a selection with no matching style file (runs in the scan band, feeds the Phase 24 report) | Standard + Deep |
+| 27 — Context Coherence | The assembled context judged as one document: over-constrained prose, a directive repeated verbatim in two files, and directives that contradict each other | Standard + Deep |
 
 ## Migration note
 
@@ -221,9 +223,9 @@ If you previously referred to phases by the old letter scheme, here is the mappi
 
 Two layers, following Anthropic's [develop-tests](https://platform.claude.com/docs/en/test-and-evaluate/develop-tests) methodology (code-grading is the fastest, most reliable tier — so the bulk is code-graded, and LLM-grading is reserved for the judgment phases):
 
-- **Deterministic (code-graded, CI-safe, no API key).** Synthetic `.claude/` fixture trees under `tests/fixtures/<case>/` each plant one defect; the suite runs `validate-skills.sh` / `scan-graph.sh` against them and asserts the exact `[TAG]` set. A `clean/` fixture asserts **zero** findings — the false-positive guard. Paired guards cover both directions, e.g. cases 73/74 (a `npm run <script>` absent from `package.json` must be flagged `CLAUDEMD-DEAD-SCRIPT`, while one that resolves must **not** be) and cases 75/76 (a memory body citing a missing `.claude/…` path is flagged `MEMORY-STALE-CONTENT`, while one whose path resolves is not). A third code-graded layer covers `scan-history.sh`: `synthetic-jsonl` fixtures plant `.claude/projects/*/*.jsonl` transcripts that `tests/test_history.sh` aggregates and asserts field-by-field against `history-scan.json` (e.g. hook failure rates, token sums, ledger folding, window-cutoff exclusion).
+- **Deterministic (code-graded, CI-safe, no API key).** Synthetic `.claude/` fixture trees under `tests/fixtures/<case>/` each plant one defect; the suite runs `validate-skills.sh` / `scan-graph.sh` against them and asserts the exact `[TAG]` set. A `clean/` fixture asserts **zero** findings — the false-positive guard. Paired guards cover both directions, e.g. cases 73/74 (a `npm run <script>` absent from `package.json` must be flagged `CLAUDEMD-DEAD-SCRIPT`, while one that resolves must **not** be) cases 75/76 (a memory body citing a missing `.claude/…` path is flagged `MEMORY-STALE-CONTENT`, while one whose path resolves is not), and cases 88/90 (a bare file-tree dump in CLAUDE.md is flagged `CLAUDEMD-OBVIOUS`, while an architecture map whose entries carry relationships is not). A third code-graded layer covers `scan-history.sh`: `synthetic-jsonl` fixtures plant `.claude/projects/*/*.jsonl` transcripts that `tests/test_history.sh` aggregates and asserts field-by-field against `history-scan.json` (e.g. hook failure rates, token sums, ledger folding, window-cutoff exclusion).
   ```bash
-  make test              # bash tests/run.sh — anonymization + eval-schema gates, then the code-graded cases (214 scanner + 13 history assertions)
+  make test              # bash tests/run.sh — anonymization + eval-schema gates, then the code-graded cases (241 scanner + 13 history assertions)
   bash tests/run.sh 02   # run one case / id-prefix (deterministic suite only)
   ```
   `tests/run.sh` also runs two release gates first: an **anonymization** check (no real scanned-project names in the published `commands/`, `tests/fixtures/`, `README.md` — the real blocklist is gitignored, a placeholder ships) and **eval-schema validation** (`validate-evals.sh` asserts every case matches the contract before an expensive run is wasted on a malformed one).

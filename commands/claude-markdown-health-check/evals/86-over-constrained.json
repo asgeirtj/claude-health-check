@@ -1,0 +1,20 @@
+{
+  "id": "86-over-constrained",
+  "command": "claude-markdown-health-check",
+  "fixture": {
+    "kind": "claude-tree",
+    "dir": "tests/fixtures/over-constrained",
+    "needs_home_override": false,
+    "scanners": ["validate-skills"]
+  },
+  "grader": { "method": "code" },
+  "success_criteria": {
+    "must_detect": [ { "tag": "OVER-CONSTRAINED", "path_substring": "rigid/SKILL.md" } ],
+    "must_not_flag": ["OVER-500-LINES", "NO-PROGRESSIVE-DISCLOSURE", "INSTRUCTION-DUPLICATED"],
+    "expect_clean": false
+  },
+  "expected_behavior": [
+    "validate-skills.sh emits [OVER-CONSTRAINED] for a SKILL.md whose body is 20 shouted absolutes per 100 lines",
+    "the finding cites both the hit count and the body line count so the density is checkable"
+  ]
+}
