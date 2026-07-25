@@ -59,6 +59,7 @@ for f in "$EVALS"/*.json; do
         case "$s" in
             validate-skills)
                 out=$("${run_env[@]}" bash "$VALIDATE" "$target" 2>&1 || true)
+                assert_validator_completed "$out" "$id: validate-skills ran to completion"
                 tags+=$'\n'$(printf '%s' "$out" | extract_validator_tags)
                 findings+=$'\n'$(printf '%s' "$out" | normalize_validator_findings)
                 ;;

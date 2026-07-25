@@ -61,6 +61,16 @@ assert_finding_at() {
     else no "$4"; printf '       no [%s] finding mentioning "%s"\n' "$2" "$3"; fi
 }
 
+# assert_validator_completed <raw-validator-output> <label>
+# validate-skills.sh always prints its "=== Summary ===" block last, so the block's
+# absence means the run aborted mid-scan (a `set -e` trip). Without this check an
+# abort emits no tags and is indistinguishable from a clean tree, so every
+# expect_clean case would pass while most of the scan never ran.
+assert_validator_completed() {
+    if strip_ansi <<<"$1" | grep -q '^=== Summary ==='; then ok "$2"
+    else no "$2"; printf '       validator aborted before its Summary block (partial scan)\n'; fi
+}
+
 # assert_empty_tagset <tagset-multiline> <label>
 assert_empty_tagset() {
     local nonempty; nonempty=$(grep -cE '^[A-Z0-9-]+$' <<<"$1" || true)

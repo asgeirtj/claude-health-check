@@ -536,6 +536,9 @@ check_npm_scripts_in_file() {
         _npm_script_status "$script" "$base_dir" && status=0 || status=$?
         [ "$status" = 1 ] && error "[CLAUDEMD-DEAD-SCRIPT] $display: \`npm run $script\` is not defined in package.json"
     done < <(grep -oE 'npm run [A-Za-z0-9:_-]+' "$src" 2>/dev/null | awk '{print $3}' | sort -u || true)
+    # The loop's status is that of its last body command; when the final scanned
+    # script is live, `[ "$status" = 1 ]` is false and `set -e` would abort the run.
+    return 0
 }
 
 # Print the @import tokens of a markdown file. An import is `@<path>` at line start
