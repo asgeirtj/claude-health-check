@@ -1,0 +1,20 @@
+{
+  "id": "94-frontmatter-orphaned-list",
+  "command": "claude-markdown-health-check",
+  "fixture": {
+    "kind": "claude-tree",
+    "dir": "tests/fixtures/frontmatter-orphaned-list",
+    "needs_home_override": false,
+    "scanners": ["validate-skills"]
+  },
+  "grader": { "method": "code" },
+  "success_criteria": {
+    "must_detect": [ { "tag": "BAD-FRONTMATTER-SCHEMA", "path_substring": "orphanlist" } ],
+    "must_not_flag": ["MISSING-DESC"],
+    "expect_clean": false
+  },
+  "expected_behavior": [
+    "validate-skills.sh emits [BAD-FRONTMATTER-SCHEMA] for the block-sequence indented under the completed scalar description: — the frontmatter is unparseable YAML and the runtime falls back to the H1 title",
+    "the description is still extracted line-wise, so MISSING-DESC does NOT fire"
+  ]
+}

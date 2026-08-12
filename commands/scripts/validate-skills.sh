@@ -168,6 +168,38 @@ extract_field() {
     ' "$file"
 }
 
+# A block-sequence item indented under a COMPLETED scalar mapping line is not
+# valid YAML — the whole frontmatter fails to parse and the runtime falls back
+# to the H1 title, silently destroying the skill's routing description. The
+# common shape: a when_to_use-style list pasted directly under
+# `description: "…"` with the key line itself missing. Detected structurally
+# (no yaml parser dependency): an item line `^\s+- ` whose nearest preceding
+# non-blank line is a top-level `key: value` scalar whose value is not a
+# block-scalar marker (| or >). Prints the offending key, or nothing.
+frontmatter_orphaned_list_key() {
+    awk '
+        NR == 1 { if ($0 ~ /^---[[:space:]]*$/) { in_fm = 1 }; next }
+        !in_fm { exit }
+        /^---[[:space:]]*$/ { exit }
+        /^[[:space:]]*$/ { next }
+        /^[[:space:]]+- / {
+            if (prev_key != "") { print prev_key; exit }
+            next
+        }
+        {
+            prev_key = ""
+            if ($0 ~ /^[A-Za-z0-9_-]+:[[:space:]]*[^[:space:]]/) {
+                v = $0
+                sub(/^[A-Za-z0-9_-]+:[[:space:]]*/, "", v)
+                if (v !~ /^[|>]/) {
+                    prev_key = $0
+                    sub(/:.*$/, "", prev_key)
+                }
+            }
+        }
+    ' "$1"
+}
+
 validate_skill_md() {
     # Validates a SKILL.md or unified command .md file. Args: <file> <display-name>
     local skill_file="$1" skill_name="$2"
@@ -182,6 +214,13 @@ validate_skill_md() {
         error "[OVER-500-LINES] $skill_name: $lines lines (max: $SKILL_MAX_LINES). Split to references/."
     elif [ "$lines" -gt $((SKILL_MAX_LINES - 50)) ]; then
         warning "$skill_name: $lines lines (approaching $SKILL_MAX_LINES limit)"
+    fi
+
+    # Check: frontmatter parses as YAML (orphaned block-sequence class)
+    local orphan_key
+    orphan_key=$(frontmatter_orphaned_list_key "$skill_file")
+    if [ -n "$orphan_key" ]; then
+        error "[BAD-FRONTMATTER-SCHEMA] $skill_name: frontmatter is not parseable YAML — a list is indented under the completed scalar '$orphan_key:' (a key line such as when_to_use: is missing above the list); the runtime falls back to the H1 title and the skill loses its routing description"
     fi
 
     # Check: description present, then length (40 min, 1024 hard, 1536 combined)
@@ -1209,7 +1248,7 @@ done
 # Guides CLAUDE.md routes to — ground their `npm run` mentions the same way.
 if [ -d "$CLAUDE_DIR/documentation/guides" ]; then
     while IFS= read -r g; do
-        check_npm_scripts_in_file "$g" "documentation/guides/$(basename "$g")"
+        check_npm_scripts_in_file "$g" "${g#"$CLAUDE_DIR"/}"
     done < <(find "$CLAUDE_DIR/documentation/guides" -name '*.md' 2>/dev/null | sort)
 fi
 check_local_md_tracked

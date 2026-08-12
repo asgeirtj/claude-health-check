@@ -1,6 +1,9 @@
 ---
 name: welltuned
 description: Lints and formats TypeScript files on demand. Use when the user asks to lint, format, or check style in .ts or .tsx files, or mentions eslint or prettier.
+when_to_use:
+  - "lint this file"
+  - "format check"
 allowed-tools: Read, Edit, Bash(eslint:*)
 disallowed-tools: WebFetch
 model: sonnet
