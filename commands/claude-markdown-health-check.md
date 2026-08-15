@@ -160,7 +160,7 @@ bash "$VALIDATE" "$USER_DIR"
 [[ -n "$PROJECT_DIR" ]] && bash "$VALIDATE" "$PROJECT_DIR"
 ```
 
-This is the deterministic layer. Trust its output for: name regex, reserved words, name/dir mismatch, missing descriptions, voice violations, line counts, chained references, dead links (skill `references/*.md`, settings `guides`, CLAUDE.md `.claude/…` paths), JSON validity, duplicate keys and array entries, MCP pre-approval, unregistered hooks, hook timeouts, memory-index size, rule scoping, TOC presence, description sizes, frontmatter schema (description min length, `model` whitelist, `allowed-tools` syntax), unknown frontmatter fields, name collisions between `commands/` and `skills/`, embedded credentials in skill/reference markdown (`EMBEDDED-SECRET`), destructive shell commands without nearby warning markers (`UNFLAGGED-DESTRUCTIVE`), and the context-engineering set relayed by Phases 12 and 27 (`OVER-CONSTRAINED`, `INSTRUCTION-DUPLICATED`, `CLAUDEMD-OBVIOUS`, `CLAUDEMD-MEMORY-DRIFT`). Later phases MUST NOT re-check anything this script already covers — they MUST only handle what the script can't.
+This is the deterministic layer. Trust its output for: name regex, name/dir mismatch, missing descriptions, voice violations, line counts, chained references, dead links (skill `references/*.md`, settings `guides`, CLAUDE.md `.claude/…` paths), JSON validity, duplicate keys and array entries, MCP pre-approval, unregistered hooks, hook timeouts, memory-index size, rule scoping, TOC presence, description sizes, frontmatter schema (`model` whitelist, `allowed-tools` syntax), unknown frontmatter fields, name collisions between `commands/` and `skills/`, embedded credentials in skill/reference markdown (`EMBEDDED-SECRET`), destructive shell commands without nearby warning markers (`UNFLAGGED-DESTRUCTIVE`), and the context-engineering set relayed by Phases 12 and 27 (`OVER-CONSTRAINED`, `INSTRUCTION-DUPLICATED`, `CLAUDEMD-OBVIOUS`, `CLAUDEMD-MEMORY-DRIFT`). Later phases MUST NOT re-check anything this script already covers — they MUST only handle what the script can't.
 
 ## Phase 6 — Skill Listing Budget
 
@@ -202,7 +202,7 @@ For each skill with ≥3 invocations in `history-scan.json`, compare `allowed-to
 
 ## Phase 10 — Frontmatter Strict Schema
 
-Already implemented as part of Phase 5's deterministic checks: `validate-skills.sh` validates `description` min length, `model` whitelist, `allowed-tools` syntax, and emits `UNKNOWN-FRONTMATTER-FIELD` for unknown keys. See `frontmatter-schema.md` for the tag rubric. No separate phase action needed — relay Phase 5 output.
+Already implemented as part of Phase 5's deterministic checks: `validate-skills.sh` validates the `model` whitelist and `allowed-tools` syntax, and emits `UNKNOWN-FRONTMATTER-FIELD` for unknown keys. See `frontmatter-schema.md` for the tag rubric. No separate phase action needed — relay Phase 5 output.
 
 ## Phase 11 — Reference Graph Health
 
@@ -425,7 +425,7 @@ issues: Skills 3 · Hooks 1 · Settings & Permissions 1
 ## Tag Set (canonical — MUST be drawn from this list)
 
 **Critical** (broken; blocks correct behaviour)
-`DEAD-REF`, `DUPLICATE-KEY`, `INVALID-JSON`, `MISSING-DESC`, `DEAD-MATCHER`, `UNREGISTERED-HOOK`, `MISSING-PRE-APPROVED`, `MEMORY-OVERFLOW`, `SKILL-BUDGET-OVERFLOW`, `STALE-THRESHOLD`, `GUIDANCE-FETCH-FAILED`, `BAD-FRONTMATTER-SCHEMA`, `NAME-COLLISION`, `SKILL-ORPHAN`, `MISSING-SKILL-GAP`, `PLUGIN-BROKEN-REF`, `PLUGIN-MISSING-MANIFEST`, `MEMORY-DEAD-LINK`, `REF-CIRCULAR`, `HOOK-FAILING`, `EMBEDDED-SECRET`, `BAD-NAME`, `RESERVED-NAME`, `OUTPUTSTYLE-MISSING`, `SETTINGS-BYPASS-MODE`, `AGENT-BAD-SCHEMA`, `AGENT-BYPASS-PERMS`, `PLUGIN-MISPLACED-DIR`, `MARKETPLACE-DEAD-SOURCE`, `CLAUDEMD-DEAD-IMPORT`, `CLAUDEMD-DEAD-SCRIPT`
+`DEAD-REF`, `DUPLICATE-KEY`, `INVALID-JSON`, `MISSING-DESC`, `DEAD-MATCHER`, `UNREGISTERED-HOOK`, `MISSING-PRE-APPROVED`, `MEMORY-OVERFLOW`, `SKILL-BUDGET-OVERFLOW`, `STALE-THRESHOLD`, `GUIDANCE-FETCH-FAILED`, `BAD-FRONTMATTER-SCHEMA`, `NAME-COLLISION`, `SKILL-ORPHAN`, `MISSING-SKILL-GAP`, `PLUGIN-BROKEN-REF`, `PLUGIN-MISSING-MANIFEST`, `MEMORY-DEAD-LINK`, `REF-CIRCULAR`, `HOOK-FAILING`, `EMBEDDED-SECRET`, `BAD-NAME`, `OUTPUTSTYLE-MISSING`, `SETTINGS-BYPASS-MODE`, `AGENT-BAD-SCHEMA`, `AGENT-BYPASS-PERMS`, `PLUGIN-MISPLACED-DIR`, `MARKETPLACE-DEAD-SOURCE`, `CLAUDEMD-DEAD-IMPORT`, `CLAUDEMD-DEAD-SCRIPT`
 
 **Structural** (works but should be reorganised)
 `UNDER-TRIGGER`, `OVER-TRIGGER`, `MISSING-TRIGGER`, `MISSING-AGENT-TRIGGER`, `OVERLAPPING-AGENT`, `DUPLICATE-LOGIC`, `MISSING-ENFORCEMENT`, `NEEDS-REFERENCES`, `RULE-CONFLICT`, `BURIED-CRITICAL`, `WEAK-DESC`, `NAME-MISMATCH`, `BAD-RULE-FRONTMATTER`, `ORPHAN-GUIDE`, `ORPHAN-PATTERN`, `REPURPOSE`, `SKILL-LOW-RELEVANCE`, `SKILL-DUPLICATE-DOMAIN`, `CLAUDEMD-STALE`, `CLAUDEMD-GENERIC`, `CLAUDEMD-THIN`, `SKILL-NEVER-FIRED`, `SKILL-DORMANT`, `SKILL-MISFIRING`, `RECURRING-DENIAL`, `SKILL-TOOL-UNDECLARED`, `HOOK-EVENT-MISMATCH`, `AGENT-NEVER-SPAWNED`, `AGENT-DUP-NAME`, `AGENT-PLUGIN-FORBIDDEN-FIELD`, `HOOK-EXIT-NONBLOCKING`, `HOOK-UNSAFE-SHELL`, `HOOK-ENV-LEAK`, `REF-TOO-DEEP`, `CONTEXT-BLOAT`, `PLUGIN-VERSION-DRIFT`, `PLUGIN-BAD-VERSION`, `PLUGIN-ABS-PATH`, `MCP-BAD-DEF`, `MODEL-NOT-AVAILABLE`, `IMPORT-TOO-DEEP`, `DESCRIPTION-TOO-LONG`, `OVER-500-LINES`, `CHAINED-REF`, `NO-PROGRESSIVE-DISCLOSURE`, `DESCRIPTION-TRUNCATED`, `MEMORY-STALE-CONTENT`

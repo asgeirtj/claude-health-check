@@ -50,14 +50,12 @@ WARNINGS=0
 # truncated at 1536 chars in skill listing.
 DESC_HARD_MAX=1024
 DESC_SOFT_MAX=1536
-DESC_MIN=40
 NAME_MAX=64
 SKILL_MAX_LINES=500
 SKILL_REF_DIR_THRESHOLD=300
 REF_TOC_THRESHOLD=100
 CLAUDE_MD_MAX_LINES=200
 IMPORT_MAX_DEPTH=4
-RESERVED_NAMES=("anthropic" "claude")
 KNOWN_FRONTMATTER_FIELDS=("name" "description" "when_to_use" "allowed-tools" "disallowed-tools" "argument-hint" "arguments" "model" "color" "user-invocable" "disable-model-invocation" "effort" "context" "agent" "hooks" "paths" "shell" "hide-from-slash-command-tool")
 MODEL_WHITELIST_RE='^(opus|sonnet|haiku|fable|inherit|claude-(opus|sonnet|haiku|fable)-[0-9])'
 # enforceAvailableModels (settings.json, then settings.local.json overriding): when
@@ -228,12 +226,6 @@ validate_skill_md() {
     when_to_use=$(extract_field "$skill_file" "when_to_use")
     if [ -n "$desc" ]; then
         local desc_len=${#desc}
-        # The min-length floor exists so a model-invoked SKILL has enough text to
-        # trigger reliably. Slash-command files are user-invoked (typed as /name),
-        # so a terse description is valid — docs require only a non-empty string.
-        if [ "$is_skill_md" = 1 ] && [ "$desc_len" -lt "$DESC_MIN" ]; then
-            error "[BAD-FRONTMATTER-SCHEMA] $skill_name: description is $desc_len chars (min: $DESC_MIN — too short to trigger reliably)"
-        fi
         if [ "$desc_len" -gt "$DESC_HARD_MAX" ]; then
             error "[DESCRIPTION-TOO-LONG] $skill_name: description is $desc_len chars (max: $DESC_HARD_MAX)"
         fi
@@ -309,15 +301,6 @@ validate_skill_md() {
         fi
         if [ "${#name}" -gt "$NAME_MAX" ]; then
             error "[BAD-NAME] $skill_name: name is ${#name} chars (max: $NAME_MAX)"
-        fi
-        if [ "$is_skill_md" = 1 ]; then
-            for reserved in "${RESERVED_NAMES[@]}"; do
-                case "$name" in
-                    *"$reserved"*)
-                        error "[RESERVED-NAME] $skill_name: name '$name' contains reserved word '$reserved' (a skill name may not contain it)"
-                        ;;
-                esac
-            done
         fi
     fi
     # Check: a SKILL.md frontmatter name must match its directory name

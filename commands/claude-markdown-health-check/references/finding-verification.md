@@ -51,7 +51,7 @@ relayed from a deterministic scanner**. The tool is the proof. These tags are
 script-owned — the orchestrator only relays them; never re-ground them here:
 
 **`validate-skills.sh` (Phase 5 / 10 / 21 — relayed verbatim):**
-`DEAD-REF`, `MISSING-DESC`, `BAD-NAME`, `RESERVED-NAME`, `NAME-MISMATCH`,
+`DEAD-REF`, `MISSING-DESC`, `BAD-NAME`, `NAME-MISMATCH`,
 `NAME-COLLISION`, `INVALID-JSON`, `DUPLICATE-KEY`, `DUPLICATE-ENTRY`,
 `MISSING-PRE-APPROVED`, `MEMORY-OVERFLOW`, `UNREGISTERED-HOOK`, `SUSPICIOUS-TIMEOUT`,
 `BAD-FRONTMATTER-SCHEMA`, `BAD-RULE-FRONTMATTER`, `RULE-OVERSIZED`,
