@@ -1,11 +1,11 @@
 {
-  "name": "asgeirtj-health-check",
+  "name": "claude-health-check",
   "owner": {
     "name": "asgeirtj"
   },
   "plugins": [
     {
-      "name": "claude-markdown-health-check",
+      "name": "claude-health-check",
       "displayName": ".claude/ Health Check",
       "source": "./",
       "version": "0.13.0",
@@ -13,8 +13,8 @@
       "author": {
         "name": "asgeirtj"
       },
-      "homepage": "https://github.com/asgeirtj/claude-markdown-health-check",
-      "repository": "https://github.com/asgeirtj/claude-markdown-health-check",
+      "homepage": "https://github.com/asgeirtj/claude-health-check",
+      "repository": "https://github.com/asgeirtj/claude-health-check",
       "license": "MIT",
       "keywords": [
         "claude-code",

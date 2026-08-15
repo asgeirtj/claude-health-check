@@ -1,0 +1,22 @@
+{
+  "id": "92-plugin-empty-install",
+  "command": "claude-health-check",
+  "fixture": {
+    "kind": "claude-tree",
+    "dir": "tests/fixtures/plugin-empty-install",
+    "needs_home_override": true,
+    "scanners": ["scan-graph"]
+  },
+  "grader": { "method": "code" },
+  "success_criteria": {
+    "must_detect": [
+      { "tag": "PLUGIN-MISSING-MANIFEST", "path_substring": "hollow-plugin" }
+    ],
+    "must_not_flag": ["PLUGIN-BROKEN-REF"],
+    "expect_clean": false
+  },
+  "expected_behavior": [
+    "the install dir holds only README.md AND its marketplace entry declares no lspServers/mcpServers/hooks/outputStyles and is not strict:false",
+    "nothing can load from this install, so PLUGIN-MISSING-MANIFEST still fires — guards case 91's exemption against over-suppressing"
+  ]
+}

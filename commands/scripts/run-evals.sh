@@ -4,13 +4,13 @@
 # A dependency-light alternative to run-evals-headless.sh (no `claude` subprocess).
 # For each evals/*.json with grader.method == "llm-rubric":
 #   1. Print the case id + its expected (and not-expected) behaviours.
-#   2. Ask you to run /claude-markdown-health-check against the named fixture in
+#   2. Ask you to run /claude-health-check against the named fixture in
 #      Claude Code, save the report, and paste its path.
 #   3. Grep the report for each expected_behavior needle; mark PASS/FAIL.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-EVALS="$REPO/commands/claude-markdown-health-check/evals"
+EVALS="$REPO/commands/claude-health-check/evals"
 filter="${1:-}"
 command -v jq >/dev/null 2>&1 || { echo "run-evals: jq is required." >&2; exit 2; }
 
@@ -26,7 +26,7 @@ for f in "$EVALS"/*.json; do
     echo "Expected behaviour:"; jq -r '.expected_behavior[]? | "  + " + .' "$f"
     echo "Expected NOT behaviour:"; jq -r '.expected_not_behavior[]? | "  - " + .' "$f"
     echo
-    read -r -p "Path to the saved /claude-markdown-health-check report (blank to skip): " report
+    read -r -p "Path to the saved /claude-health-check report (blank to skip): " report
     [ -z "$report" ] && { echo "SKIPPED"; continue; }
     [ ! -f "$report" ] && { echo "FAIL: report not found at $report"; fail=$((fail + 1)); continue; }
 

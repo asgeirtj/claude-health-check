@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# validate-evals.sh — schema/validity gate for claude-markdown-health-check eval
+# validate-evals.sh — schema/validity gate for claude-health-check eval
 # cases. Validates every evals/*.json (skipping README*) against the contract the
 # headless runner (run-evals-headless.sh) and the deterministic suite depend on,
 # so a malformed case is caught cheaply HERE instead of wasting an expensive
@@ -8,7 +8,7 @@
 # Per case (ERROR = fails the gate):
 #   - parses as a JSON object
 #   - id == filename stem
-#   - .command == "claude-markdown-health-check"
+#   - .command == "claude-health-check"
 #   - fixture.kind == "claude-tree"
 #   - fixture.dir is non-empty, exists on disk, and has a .claude/ subtree
 #   - fixture.scanners ⊆ { "validate-skills", "scan-graph" }
@@ -25,7 +25,7 @@ set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"          # commands/scripts
 REPO="$(cd "$HERE/../.." && pwd)"
-EVALS="${1:-$REPO/commands/claude-markdown-health-check/evals}"
+EVALS="${1:-$REPO/commands/claude-health-check/evals}"
 
 command -v jq >/dev/null 2>&1 || { echo "validate-evals: jq is required." >&2; exit 2; }
 [ -d "$EVALS" ] || { echo "validate-evals: no such dir: $EVALS" >&2; exit 2; }
@@ -52,8 +52,8 @@ for f in "$EVALS"/*.json; do
   [ "$(jq -r '.id // empty' "$f")" = "$stem" ] \
     || err "$base: id ('$(jq -r '.id // empty' "$f")') != filename stem ('$stem')"
 
-  [ "$(jq -r '.command // empty' "$f")" = "claude-markdown-health-check" ] \
-    || err "$base: .command != 'claude-markdown-health-check'"
+  [ "$(jq -r '.command // empty' "$f")" = "claude-health-check" ] \
+    || err "$base: .command != 'claude-health-check'"
 
   fkind="$(jq -r '.fixture.kind // empty' "$f")"
   case "$fkind" in

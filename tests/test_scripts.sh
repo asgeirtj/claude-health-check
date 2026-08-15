@@ -16,7 +16,7 @@ REPO="$(cd "$HERE/.." && pwd)"
 # shellcheck source=tests/lib.sh
 . "$HERE/lib.sh"
 
-EVALS="$REPO/commands/claude-markdown-health-check/evals"
+EVALS="$REPO/commands/claude-health-check/evals"
 VALIDATE="$REPO/commands/scripts/validate-skills.sh"
 GRAPH="$REPO/commands/scripts/scan-graph.sh"
 

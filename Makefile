@@ -1,14 +1,14 @@
-# Makefile for the /claude-markdown-health-check command
+# Makefile for the /claude-health-check command
 #
 # `make install`    — install the command, its references, and the validator into ~/.claude/
 # `make uninstall`  — remove the installed command + reference tree
-# `make check-self` — install, then remind you to run /claude-markdown-health-check
+# `make check-self` — install, then remind you to run /claude-health-check
 
 CLAUDE_DIR  := $(HOME)/.claude
-CMD_SRC     := commands/claude-markdown-health-check.md
-CMD_DEST    := $(CLAUDE_DIR)/commands/claude-markdown-health-check.md
-REF_SRC     := commands/claude-markdown-health-check/references
-REF_DEST    := $(CLAUDE_DIR)/claude-markdown-health-check/references
+CMD_SRC     := commands/claude-health-check.md
+CMD_DEST    := $(CLAUDE_DIR)/commands/claude-health-check.md
+REF_SRC     := commands/claude-health-check/references
+REF_DEST    := $(CLAUDE_DIR)/claude-health-check/references
 SCRIPT_SRC  := commands/scripts/validate-skills.sh
 SCRIPT_DEST := $(CLAUDE_DIR)/commands/scripts/validate-skills.sh
 GRAPH_SRC   := commands/scripts/scan-graph.sh
@@ -22,7 +22,7 @@ help:
 	@echo "Targets:"
 	@echo "  install     install command + references + scripts into ~/.claude/"
 	@echo "  uninstall   remove the installed command + reference tree"
-	@echo "  check-self  install, then run /claude-markdown-health-check in Claude Code"
+	@echo "  check-self  install, then run /claude-health-check in Claude Code"
 	@echo "  smoke-scan  refresh both scan caches and print their meta blocks"
 	@echo "  test        run the deterministic test suite (code-graded, no API key)"
 	@echo "  evals       run the opt-in LLM-graded behavioural evals (needs the claude CLI)"
@@ -44,13 +44,13 @@ install:
 
 uninstall:
 	@rm -f "$(CMD_DEST)"
-	@rm -rf "$(CLAUDE_DIR)/claude-markdown-health-check"
+	@rm -rf "$(CLAUDE_DIR)/claude-health-check"
 	@echo "Removed: $(CMD_DEST)"
-	@echo "Removed: $(CLAUDE_DIR)/claude-markdown-health-check/"
+	@echo "Removed: $(CLAUDE_DIR)/claude-health-check/"
 	@echo "Left in place (shared dir): $(SCRIPT_DEST) $(GRAPH_DEST) $(HIST_DEST)"
 
 check-self: install
-	@echo "Now run /claude-markdown-health-check inside Claude Code."
+	@echo "Now run /claude-health-check inside Claude Code."
 
 smoke-scan:
 	@bash "$(GRAPH_SRC)" --refresh 2>/dev/null | jq '.meta'

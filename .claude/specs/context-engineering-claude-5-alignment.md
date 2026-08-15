@@ -31,15 +31,15 @@ Source: https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-
 ## Files to create / change
 
 - `commands/scripts/validate-skills.sh` — 4 new checks
-- `commands/claude-markdown-health-check.md` — Phase 5/8/12 text, new Phase 27, depth
+- `commands/claude-health-check.md` — Phase 5/8/12 text, new Phase 27, depth
   table, tag set, de-duplication of its own repeated instructions
-- `commands/claude-markdown-health-check/references/report-format.md` — tag→domain map
-- `commands/claude-markdown-health-check/references/finding-verification.md` — fast-path
+- `commands/claude-health-check/references/report-format.md` — tag→domain map
+- `commands/claude-health-check/references/finding-verification.md` — fast-path
   list, `RULE-CONFLICT` row, removal of the two retired rows
-- `commands/claude-markdown-health-check/references/claude-md-quality.md` — new
+- `commands/claude-health-check/references/claude-md-quality.md` — new
   deterministic rows, "avoid the obvious" red flag, re-weighted score table
 - `tests/fixtures/{over-constrained,instruction-duplicated,claudemd-obvious,claudemd-memory-drift,rule-conflict}/`
-- `commands/claude-markdown-health-check/evals/{86..90}-*.json`
+- `commands/claude-health-check/evals/{86..90}-*.json`
 - `README.md`, `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`
 
 ## Open questions / risks
@@ -73,7 +73,7 @@ Source: https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-
    - key decision: one planted defect per fixture, plus false-positive guards.
    - default: code-graded for the 4 deterministic tags, `llm-rubric` for `RULE-CONFLICT`.
    - verify: `bash tests/run.sh`, `validate-evals.sh` schema gate.
-   - affected files: `tests/fixtures/**`, `commands/claude-markdown-health-check/evals/*`
+   - affected files: `tests/fixtures/**`, `commands/claude-health-check/evals/*`
 4. Retire the examples mandate + wire the new tags into the command and references.
    - key decision: which domain owns the cross-cutting tags.
    - default: `Context` domain for `OVER-CONSTRAINED` / `INSTRUCTION-DUPLICATED` /
@@ -87,7 +87,7 @@ Source: https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-
      no-write, and privacy rule verbatim.
    - verify: `validate-skills.sh` on this repo reports no `INSTRUCTION-DUPLICATED` for the
      collapsed lines; the autonomy-gate eval text is untouched.
-   - affected files: `commands/claude-markdown-health-check.md`
+   - affected files: `commands/claude-health-check.md`
 6. Docs + version.
    - key decision: minor or patch bump.
    - default: minor (0.11.0 → 0.12.0) — new tags are a contract addition.
