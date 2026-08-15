@@ -4,7 +4,7 @@
   "version": "0.13.0",
   "description": "Audits the .claude/ ecosystem — skills, commands, hooks, agents, settings, plugins, memory — for dead references, weak triggers, token bloat, dormant skills, permission drift, hook reliability, memory hygiene, and context bloat. Evidence-grounds every judgment finding before reporting. Diverged fork: no reserved-name or description-minimum checks; disable-model-invocation skills excluded from listing cost.",
   "author": {
-    "name": "Nicolas Coevoet"
+    "name": "asgeirtj"
   },
   "homepage": "https://github.com/asgeirtj/claude-markdown-health-check",
   "repository": "https://github.com/asgeirtj/claude-markdown-health-check",
