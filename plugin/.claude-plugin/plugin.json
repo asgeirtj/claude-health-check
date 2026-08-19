@@ -1,7 +1,7 @@
 {
   "name": "claude-health-check",
   "displayName": ".claude/ Health Check",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Audits the .claude/ ecosystem \u2014 skills, commands, hooks, agents, settings, plugins, memory \u2014 for dead references, weak triggers, token bloat, dormant skills, permission drift, hook reliability, memory hygiene, and context bloat. Evidence-grounds every judgment finding before reporting. Diverged fork: no reserved-name or description-minimum checks; disable-model-invocation skills excluded from listing cost.",
   "author": {
     "name": "asgeirtj"
@@ -20,6 +20,5 @@
     "telemetry",
     "permissions",
     "memory"
-  ],
-  "commands": "./commands/claude-health-check.md"
+  ]
 }

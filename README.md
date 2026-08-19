@@ -1,7 +1,7 @@
 # /claude-health-check
 
 [![CI](https://github.com/asgeirtj/claude-health-check/actions/workflows/ci.yml/badge.svg)](https://github.com/asgeirtj/claude-health-check/actions/workflows/ci.yml)
-[![version](https://img.shields.io/badge/version-0.15.0-blue)](.claude-plugin/plugin.json)
+[![version](https://img.shields.io/badge/version-0.15.1-blue)](.claude-plugin/plugin.json)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://code.claude.com/docs/en/plugins)
 
@@ -248,7 +248,7 @@ Tags are the stable machine contract, so the code-graded cases are immune to rep
 
 ```
 plugin/                                      # the only tree marketplace installs copy (marketplace source: ./plugin)
-├── .claude-plugin/plugin.json               # plugin manifest (commands pinned to the one file)
+├── .claude-plugin/plugin.json               # plugin manifest
 ├── commands/
 │   ├── claude-health-check.md               # the slash command (~440 lines, orchestrator)
 │   └── scripts/
