@@ -1,7 +1,7 @@
 ---
 description: Audits the .claude/ ecosystem (skills, hooks, guides, agents, settings, plugins, memory) for dead refs, weak triggers, token bloat, rule drift, frontmatter violations, dormant skills, hook reliability, permission drift, memory hygiene, and context bloat. Reports findings, then applies user-approved fixes. Run before publishing skill changes or when configuration feels stale.
 allowed-tools: Bash(bash ~/.claude/commands/scripts/validate-skills.sh:*) Bash(bash:*commands/scripts/validate-skills.sh:*) Bash(bash ~/.claude/commands/scripts/scan-graph.sh:*) Bash(bash:*commands/scripts/scan-graph.sh:*) Bash(bash ~/.claude/commands/scripts/scan-history.sh:*) Bash(bash:*commands/scripts/scan-history.sh:*) Bash(ls:*) Bash(wc:*) Bash(jq:*) Bash(find:*) Bash(stat:*) Bash(cat:*) Bash(mkdir:*) Bash(date:*) Read Glob Grep WebFetch Write Edit
-argument-hint: "[quick|deep|--refresh|--compress-bodies|--window-days=N|<focus message>]"
+argument-hint: "[--refresh|--compress-bodies|--window-days=N|<focus message>]"
 ---
 
 You are a `.claude/` ecosystem auditor. Scan silently, then print one flat prioritized report.
@@ -47,7 +47,7 @@ SKIP_PHASES="$(jq -rn     --argjson c "$CFG" '($c.skipPhases // []) | join(" ")'
 TTL_DAYS="$(jq -rn        --argjson c "$CFG" '$c.guidanceCacheTtlDays // 7')"
 ```
 
-Apply them: `depth`/`quick`/`deep` CLI args override `CFG.depth` in Phase 3; `WINDOW` feeds the telemetry phases; `VERIFY_FINDINGS` gates the Pre-print grounding step (off ⇒ judgment findings emitted unverified); `SKIP_PHASES` removes phases (**Phase 5 is never skippable** — it is the deterministic spine); `SEVERITY_FLOOR`/`MAX_PER_DOMAIN` shape the report (Phase 24); `compressBodies` mirrors `--compress-bodies` (Phase 13). If the config file is present but invalid JSON, emit `[OBSERVATION] config: markdown-health-check.json is not valid JSON — using defaults` and proceed with defaults.
+Apply them: `WINDOW` feeds the telemetry phases; `VERIFY_FINDINGS` gates the Pre-print grounding step (off ⇒ judgment findings emitted unverified); `SKIP_PHASES` removes phases (**Phase 5 is never skippable** — it is the deterministic spine); `SEVERITY_FLOOR`/`MAX_PER_DOMAIN` shape the report (Phase 24); `compressBodies` mirrors `--compress-bodies` (Phase 13). If the config file is present but invalid JSON, emit `[OBSERVATION] config: markdown-health-check.json is not valid JSON — using defaults` and proceed with defaults.
 
 ### Thresholds (fetch + cache)
 
@@ -96,7 +96,7 @@ Note: a `command` hook under a `UserPromptSubmit` event defaults to 30s (not 600
 
 ## Phase 2 — Plugin Install Integrity
 
-Static check of `~/.claude/plugins/installed_plugins.json` vs the on-disk cache. Standard + Deep; skipped at Quick.
+Static check of `~/.claude/plugins/installed_plugins.json` vs the on-disk cache.
 
 ```bash
 GRAPH="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/.cache}/graph-scan.json"
@@ -108,24 +108,15 @@ See `plugin-integrity.md` for tag definitions (`PLUGIN-BROKEN-REF`, `PLUGIN-MISS
 
 When the scanned tree is a **plugin root** (a `.claude-plugin/plugin.json` is present), the phase-2 pass also validates the plugin's own structure (any scope, so the tool dogfoods on plugin repos): a component dir (`skills`/`agents`/`commands`/`hooks`/`output-styles`/`monitors`) nested inside `.claude-plugin/` → `PLUGIN-MISPLACED-DIR`; a missing or non-semver `version` → `PLUGIN-BAD-VERSION`; a declared component path that isn't relative-with-`./` → `PLUGIN-ABS-PATH`; a `marketplace.json` plugin `source` that resolves to no directory → `MARKETPLACE-DEAD-SOURCE`.
 
-## Phase 3 — Select Depth
+## Phase 3 — Phase Set
 
-```bash
-SKILLS=$(ls "$USER_DIR"/skills/*/SKILL.md ${PROJECT_DIR:+"$PROJECT_DIR"/skills/*/SKILL.md} 2>/dev/null | wc -l)
-HOOKS=$(ls "$USER_DIR"/hooks/*.sh ${PROJECT_DIR:+"$PROJECT_DIR"/hooks/*.sh} 2>/dev/null | wc -l)
-```
+Every invocation runs the full audit — all phases 1–27. There are no depth modes.
 
-| Depth | Trigger | Phases |
-|-------|---------|--------|
-| Quick | user said `quick`, OR `$SKILLS<10 && $HOOKS<5` | 1, 5, 6, 10, 21, 24, 25 + spot-check 3 highest-risk skills |
-| Standard | default | 1–18, 20, 24, 25, 27 |
-| Deep | user said `deep` / `comprehensive`, OR `$SKILLS>20` | 1–27 (full) |
-
-`--window-days=N` overrides the 30-day default used by Phases 7, 9, 15, 16, 19, 22, 23. When no `quick`/`deep` arg is given, the `depth` config key (`config-keys.md`) sets the floor; `SKIP_PHASES` (config) then removes any listed phases from the selected set — except Phase 5, which always runs.
+`--window-days=N` overrides the 30-day default used by Phases 7, 9, 15, 16, 19, 22, 23. `SKIP_PHASES` (config) removes any listed phases from the set — except Phase 5, which always runs.
 
 ## Phase 4 — Read Focus + History
 
-**If the user passed a focus message** (anything that is not `quick`/`deep`/`--refresh`/`--compress-bodies`/`--window-days=*`):
+**If the user passed a focus message** (anything that is not `--refresh`/`--compress-bodies`/`--window-days=*`):
 1. Treat it as the #1 priority. Tag findings related to it as `NEW-RULE`, `NEW-PATTERN`, or `SKILL-UPDATE`.
 2. Search whether the topic is already covered in any guide, pattern, skill, or CLAUDE.md rule. If not, flag it.
 3. List every place the rule SHOULD be propagated (MEMORY.md, critical-rules.md, relevant patterns, SKILL.md files, hooks).
@@ -140,7 +131,7 @@ HOOKS=$(ls "$USER_DIR"/hooks/*.sh ${PROJECT_DIR:+"$PROJECT_DIR"/hooks/*.sh} 2>/d
   - Knowledge applied from external lookups → `NEW-REFERENCE`
   - Patterns successfully applied that no skill covers → `SKILL-UPDATE`
 
-**Deep depth current-session metrics**:
+**Current-session metrics**:
 ```bash
 ENC=$(pwd | tr '/' '-')
 SESSION_DIR=""; best=0
@@ -168,7 +159,7 @@ Audits whether the cumulative skill-listing block fits Claude Code's runtime bud
 
 ## Phase 7 — Skill Usage Metrics
 
-Cross-session invocation, dormancy, and orphan detection over the 30-day window. Standard + Deep.
+Cross-session invocation, dormancy, and orphan detection over the 30-day window.
 
 ```bash
 HIST="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/.cache}/history-scan.json"
@@ -217,7 +208,7 @@ This phase judges whether each CLAUDE.md / `CLAUDE.local.md` in scope is actuall
 
 Then compute the **per-file CLAUDE.md score** (always-on; see the rubric in `claude-md-quality.md`) from the surviving findings and render it per `report-format.md`.
 
-Skip at Quick depth. A short but accurate CLAUDE.md is not a finding.
+A short but accurate CLAUDE.md is not a finding.
 
 Two more judgment-free relays land here from Phase 5, both from the Claude 5 context-engineering guidance: a block of ≥6 consecutive bare path lines whose entries resolve on disk → `CLAUDEMD-OBVIOUS` (the file tree is one tool call away; the budget belongs to the gotchas), and ≥3 memory-shaped bullets — "Remember …", "The user prefers …", anything under a *Notes to self* / *Memories* heading → `CLAUDEMD-MEMORY-DRIFT` (auto-memory owns those now, and keeps them out of every-turn context). An annotated architecture map, where each entry carries a relationship or a quirk, is not a listing — it is exactly what the file should hold.
 
@@ -225,7 +216,7 @@ Deterministic CLAUDE.md checks run inside `validate-skills.sh` (Phase 5) and rel
 
 ## Phase 13 — Body Compression (detection + opt-in rewrite)
 
-Detects prose drift in skill bodies, rule bodies, and reference files. Detection always runs at Standard + Deep depth and emits `BODY-FILLER-HIGH` (Hygiene). Rewrite sub-phase is opt-in only — triggered by `--compress-bodies` or the `compressBodies` config key.
+Detects prose drift in skill bodies, rule bodies, and reference files. Detection always runs and emits `BODY-FILLER-HIGH` (Hygiene). Rewrite sub-phase is opt-in only — triggered by `--compress-bodies` or the `compressBodies` config key.
 
 See `body-compression.md` for the filler-density formula, candidate selection rules, the constrained cavecrew-builder prompt template, post-rewrite validation gates, and the idempotency marker convention.
 
@@ -303,7 +294,7 @@ For each `ORPHAN-GUIDE` / `ORPHAN-PATTERN`, BEFORE proposing deletion check ALL 
 
 If all four hold → tag `REPURPOSE` with `<source> → <skill>/references/<name>.md` and a one-line reason. Otherwise propose deletion.
 
-## Phase 19 — Cross-Session Pattern Mining (Deep only)
+## Phase 19 — Cross-Session Pattern Mining
 
 Recurring denials, correction clusters, and skill-gap detection. See `cross-session-patterns.md`. Tags: `RECURRING-DENIAL` (Structural), `RECURRING-CORRECTION` (Hygiene), `MISSING-SKILL-GAP` (Critical). `HOOK-FAILING` is owned by Phase 16; this phase does not re-flag.
 
@@ -311,7 +302,7 @@ Recurring denials, correction clusters, and skill-gap detection. See `cross-sess
 
 Link-index audit for every `~/.claude/projects/*/memory/MEMORY.md`. See `memory-hygiene.md`. Tags: `MEMORY-DEAD-LINK` (Critical), `MEMORY-ORPHAN-FILE` (Hygiene), `MEMORY-DUP-ENTRY` (Hygiene), `MEMORY-STALE-DATE` (Hygiene). Freeform MEMORY.md files (no link-index lines) are skipped.
 
-**Content grounding (Standard + Deep) → `MEMORY-STALE-CONTENT` (Structural).** Beyond the link-index, catch a memory body asserting something the tree now contradicts. Two slices: the **deterministic** slice — a body citing a missing `.claude/…` path — is relayed from `validate-skills.sh` (Phase 5), no re-grounding. The **judgment** slice — a body asserting a behaviour the code disproves (e.g. "pre-commit runs vitest+prettier" when `.husky/pre-commit` runs prettier only) — runs through the Pre-print grounding gate and survives only with a quotable contradicting artifact AND the described project actually on disk to read; otherwise abstain (no flag). Ground ONLY claims naming a concrete artifact; skip pure prose/preference memories. See `memory-hygiene.md`.
+**Content grounding → `MEMORY-STALE-CONTENT` (Structural).** Beyond the link-index, catch a memory body asserting something the tree now contradicts. Two slices: the **deterministic** slice — a body citing a missing `.claude/…` path — is relayed from `validate-skills.sh` (Phase 5), no re-grounding. The **judgment** slice — a body asserting a behaviour the code disproves (e.g. "pre-commit runs vitest+prettier" when `.husky/pre-commit` runs prettier only) — runs through the Pre-print grounding gate and survives only with a quotable contradicting artifact AND the described project actually on disk to read; otherwise abstain (no flag). Ground ONLY claims naming a concrete artifact; skip pure prose/preference memories. See `memory-hygiene.md`.
 
 ## Phase 21 — Name Collisions
 
@@ -321,7 +312,7 @@ Already implemented in Phase 5: `validate-skills.sh` emits `NAME-COLLISION` (Cri
 
 For each agent file under `~/.claude/agents/`, check `history-scan.json` → `.agentSpawns`. Emit `AGENT-NEVER-SPAWNED` (Structural) when the subagent never appears in the window. See `cross-session-patterns.md` for the matching algorithm (name + Jaccard fallback).
 
-## Phase 23 — Token Trend (Deep only)
+## Phase 23 — Token Trend
 
 Per-session `message.usage` aggregates from `history-scan.json` → `.tokenUsage`. See `token-trend.md`. Tags: `LOW-CACHE-HIT` (Hygiene), `CONTEXT-BLOAT` (Structural).
 
@@ -337,29 +328,12 @@ See `output-styles.md` for the tag definition: `OUTPUTSTYLE-MISSING` (Critical �
 
 ## Phase 27 — Context Coherence
 
-Judges the assembled context — CLAUDE.md and its imports, skills, commands, rules, output styles — as the single document the model actually reads. Standard + Deep. See `context-coherence.md` for thresholds, calibration, and remediation.
+Judges the assembled context — CLAUDE.md and its imports, skills, commands, rules, output styles — as the single document the model actually reads. See `context-coherence.md` for thresholds, calibration, and remediation.
 
 - `OVER-CONSTRAINED` (Hygiene) and `INSTRUCTION-DUPLICATED` (Hygiene) relay from Phase 5 — deterministic, no re-checking.
 - `RULE-CONFLICT` (Structural) is the judgment check: two directives a single request cannot satisfy at once. It survives the Pre-print grounding gate only with both sides quoted, file and line each.
 
 ## Phase 24 — Report
-
-### Quick Report (Quick depth only)
-
-```
-## Quick Health Check
-- Skills: X total, Y issues
-- Hooks: X registered, Y issues
-- Cross-refs: X dead links
-- Token budget: CLAUDE.md N/<claudeMd.maxLines>, largest skill: <name> M/<skillMd.maxLines>
-- Skill listing: ~Xk chars / ~Yk effective budget (lower bound — plugins/bundled excluded)
-- Session: X tool calls (Y% ok), Z reworks, W corrections   ← if available
-
-### Action Items
-1. 🔴 must-fix <plain-language problem>                          · TAG
-```
-
-### Full Report (Standard / Deep)
 
 Render per `references/report-format.md`: a scorecard, then findings grouped by
 DOMAIN (not by severity tier), each a plain-language sentence with a
@@ -370,7 +344,7 @@ One scorecard + grouped block per scope present.
 ## .claude health (<scope>) — grade <A|B|C|D>
 issues: <Domain N · Domain N · …>          ← only domains with findings
 
-### Session Metrics                       ← deep depth current-session, omit otherwise
+### Session Metrics                       ← current-session, omit when unavailable
 Tool calls: X (Y% ok) | Reworks: Z | Corrections: W | Builds: V/N
 
 ### Plugin Integrity                      ← phase 2, omit when clean
@@ -379,8 +353,8 @@ Tool calls: X (Y% ok) | Reworks: Z | Corrections: W | Builds: V/N
 ### Permission Hygiene                    ← phase 15, omit when clean
 ### Hook Health                           ← phase 16, omit when clean
 ### Auto-memory                           ← phase 20, omit when clean
-### Cross-session patterns (last 30d)     ← phase 19, deep only
-### Context Trend (last 30d)              ← phase 23, deep only
+### Cross-session patterns (last 30d)     ← phase 19, omit when no signal
+### Context Trend (last 30d)              ← phase 23, omit when no signal
 
 ## <Domain>                               ← fixed order; omit empty (see report-format.md)
  N. 🔴 must-fix <plain-language problem>

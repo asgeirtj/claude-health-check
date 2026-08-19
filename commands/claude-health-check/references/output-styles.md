@@ -2,8 +2,8 @@
 
 Audits `.claude/output-styles/*.md` against the selected `outputStyle` setting.
 Output styles are a 2026 surface: per-session system-prompt presets, selected via
-`settings.json#outputStyle` or interactively through `/config`. Runs at Standard +
-Deep depth, any tree.
+`settings.json#outputStyle` or interactively through `/config`. Runs on every
+invocation, any tree.
 
 ## Source
 

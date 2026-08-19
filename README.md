@@ -1,7 +1,7 @@
 # /claude-health-check
 
 [![CI](https://github.com/asgeirtj/claude-health-check/actions/workflows/ci.yml/badge.svg)](https://github.com/asgeirtj/claude-health-check/actions/workflows/ci.yml)
-[![version](https://img.shields.io/badge/version-0.10.0-blue)](.claude-plugin/plugin.json)
+[![version](https://img.shields.io/badge/version-0.14.0-blue)](.claude-plugin/plugin.json)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-8A2BE2)](https://code.claude.com/docs/en/plugins)
 
@@ -45,8 +45,8 @@ A scorecard with a letter grade, an always-on per-file CLAUDE.md score, and find
 | **Memory hygiene** | dead `- [Title](file.md)` links, orphan files in memory dir, duplicate entries, stale dates (>365d), **stale body content** — a memory citing a path/script/behaviour the current tree contradicts |
 | **CLAUDE.md content** | dead `npm run <script>` (not in any `package.json` from the file up to the repo root), **self-referential count drift** ("all 36 rules" when the file holds 41), stale commands/paths/versions, generic boilerplate, missing build/test/run commands, a file-tree dump the file system already shows, session facts that belong in auto-memory — plus an always-on **per-file 0–100 score** with a criteria breakdown |
 | **CLAUDE.md imports** | dead `@path` imports, `@import` chains past the 4-hop limit, a `CLAUDE.local.md` not covered by `.gitignore` |
-| **Context trend** (Deep depth) | low cache-hit sessions, output bloat per session |
-| **Cross-session patterns** (Deep depth) | recurring tool denials, recurring user corrections, missing skill gaps (subagents repeatedly spawned with no matching skill) |
+| **Context trend** | low cache-hit sessions, output bloat per session |
+| **Cross-session patterns** | recurring tool denials, recurring user corrections, missing skill gaps (subagents repeatedly spawned with no matching skill) |
 
 Thresholds — line counts, description caps, budget fractions, hook timeouts — are pulled live from the official Anthropic docs and cached for a week, so the audit tracks the spec instead of hardcoding it.
 
@@ -122,9 +122,7 @@ Inside Claude Code:
 
 | Argument | Effect |
 |---|---|
-| _(empty)_ | Audits both `~/.claude` and any `./.claude`; depth auto-selected from ecosystem size |
-| `quick` | Fast pass — validator + budget audit + frontmatter / name-collision checks + spot-check 3 highest-risk skills |
-| `deep` | Full audit including cross-session pattern mining and per-session token trend |
+| _(empty)_ | Full audit of both `~/.claude` and any `./.claude` — every phase runs, every time |
 | `--refresh` | Re-fetch threshold values from the Anthropic docs instead of using the week-long cache |
 | `--compress-bodies` | Opt-in caveman:lite rewrite of skill / rule / reference bodies that pass the filler-density gate; requires the caveman plugin |
 | `--window-days=N` | Override the 30-day window used by history-driven phases (7, 9, 15, 16, 19, 22, 23) |
@@ -134,8 +132,6 @@ Examples:
 
 ```
 /claude-health-check
-/claude-health-check quick
-/claude-health-check deep
 /claude-health-check --refresh
 /claude-health-check --compress-bodies
 /claude-health-check --window-days=7
@@ -151,7 +147,6 @@ Drop a `markdown-health-check.json` in `~/.claude/` (user defaults) and/or `./.c
 | Key | Default | Effect |
 |---|---|---|
 | `windowDays` | `30` | History window for the telemetry phases (same as `--window-days=N`) |
-| `depth` | `"auto"` | Depth floor — `"auto"`, `"quick"`, `"standard"`, `"deep"` (a `quick`/`deep` arg overrides it) |
 | `verifyFindings` | `true` | Run the evidence-grounding gate over judgment findings; `false` emits them unverified (debug) |
 | `skipPhases` | `[]` | Phase numbers to skip (Phase 5, the deterministic spine, never skips) |
 | `compressBodies` | `false` | Persistent equivalent of `--compress-bodies` |
@@ -169,35 +164,37 @@ Full per-key rationale: [`references/config-keys.md`](commands/claude-health-che
 
 The phase sequence runs flat from 1 to 25, renumbered from the previous 5a / 5b / 5.5 / 7a scheme — see the [Migration note](#migration-note) below. Phases 26 (Output Styles) and 27 (Context Coherence) were added later; both run in the scan band and feed the Phase 24 report like the other scanners.
 
-| Phase | What it does | Depth |
-|---|---|---|
-| 1 — Load Config + Thresholds | Reads optional `markdown-health-check.json`, then fetches skill / memory / settings / hooks limits from the Anthropic docs; caches at `~/.claude/.cache/claude-health-check-guidance.json` | All |
-| 2 — Plugin + MCP Integrity | `installed_plugins.json` vs on-disk cache: broken refs, missing manifests, version drift; deprecated `sse` MCP transport in `.mcp.json` | Standard + Deep |
-| 3 — Select Depth | Picks Quick / Standard / Deep from the argument and the size of your ecosystem | All |
-| 4 — Focus + History | Reads the focus message (if any) and mines the current session for recurring bugs, corrections, uncovered patterns | Standard + Deep |
-| 5 — Run validate-skills.sh | Deterministic layer: name regex, line counts, voice, TOC, description sizes, frontmatter schema, name collisions | All |
-| 6 — Skill Listing Budget | Cumulative skill-listing block vs Claude Code's runtime budget | Standard + Deep |
-| 7 — Skill Usage Metrics | Per-skill 30-day invocation, dormancy, misfiring, orphan detection from `~/.claude/projects/**/*.jsonl` + `~/.claude.json#skillUsage` | Standard + Deep |
-| 8 — Skill Semantic Audit | Judgment-call checks the validator can't do — trigger quality, structure, resolvability | Standard + Deep |
-| 9 — Skill–Tool Contract | Declared `allowed-tools` vs actually-called tools, per skill | Standard + Deep |
-| 10 — Frontmatter Strict Schema | Description min length, `model` whitelist, `allowed-tools` syntax, unknown fields (runs inside Phase 5) | All |
-| 11 — Reference Graph Health | Cycles, depth violations, orphan ref files | Standard + Deep |
-| 12 — CLAUDE.md Content Quality | Whether each CLAUDE.md actually helps — stale commands, generic boilerplate, thin coverage | Standard + Deep |
-| 13 — Body Compression | Detects high-filler bodies; `--compress-bodies` opens the opt-in caveman:lite rewrite path | Standard + Deep |
-| 14 — Hooks, Agents, Settings | Registration, duplication, timeouts, broad patterns, stale reminders, risky security keys (`bypassPermissions`, `enableAllProjectMcpServers`) | Standard + Deep |
-| 15 — Permission Allowlist Hygiene | Dead entries, over-broad `:*` patterns | Standard + Deep |
-| 16 — Hook Latency + Reliability | Per-hook failure-rate, never-fired hooks, event-type mismatches | Standard + Deep |
-| 17 — Cross-references + Orphans | Dead paths, orphaned guides/patterns, missing triggers, memory-index overflow | Standard + Deep |
-| 18 — Orphan Repurposing | For each orphan, propose repurposing into an existing skill before deletion | Standard + Deep |
-| 19 — Cross-Session Pattern Mining | Recurring denials, correction clusters, missing-skill gaps | Deep |
-| 20 — Auto-memory Hygiene | Dead `- [Title](file.md)` links, orphan files, duplicates, stale dates | Standard + Deep |
-| 21 — Name Collisions | Same basename in `commands/` and `skills/` (runs inside Phase 5) | All |
-| 22 — Agents Never-Spawned | Agents on disk never invoked in window | Standard + Deep |
-| 23 — Token Trend | Per-session input/output/cache tokens — low cache-hit, output bloat | Deep |
-| 24 — Report | A mandatory pre-print pass first **grounds every judgment finding** (drop / downgrade / keep-with-`Evidence:`), then renders a scorecard + findings grouped by area, each a plain-language line with a must-fix / should / polish chip and a trailing tag code; optional summary blocks per active phase | All |
-| 25 — Post-Report Menu | Pick a fix scope, apply, re-validate, loop until done | All |
-| 26 — Output Styles | `.claude/output-styles/*.md` vs the selected `outputStyle`: flags a selection with no matching style file (runs in the scan band, feeds the Phase 24 report) | Standard + Deep |
-| 27 — Context Coherence | The assembled context judged as one document: over-constrained prose, a directive repeated verbatim in two files, and directives that contradict each other | Standard + Deep |
+Every phase runs on every invocation — there are no depth modes.
+
+| Phase | What it does |
+|---|---|
+| 1 — Load Config + Thresholds | Reads optional `markdown-health-check.json`, then fetches skill / memory / settings / hooks limits from the Anthropic docs; caches at `~/.claude/.cache/claude-health-check-guidance.json` |
+| 2 — Plugin + MCP Integrity | `installed_plugins.json` vs on-disk cache: broken refs, missing manifests, version drift; deprecated `sse` MCP transport in `.mcp.json` |
+| 3 — Phase Set | Confirms the full 1–27 set (minus any `skipPhases` config exclusions) |
+| 4 — Focus + History | Reads the focus message (if any) and mines the current session for recurring bugs, corrections, uncovered patterns |
+| 5 — Run validate-skills.sh | Deterministic layer: name regex, line counts, voice, TOC, description sizes, frontmatter schema, name collisions |
+| 6 — Skill Listing Budget | Cumulative skill-listing block vs Claude Code's runtime budget |
+| 7 — Skill Usage Metrics | Per-skill 30-day invocation, dormancy, misfiring, orphan detection from `~/.claude/projects/**/*.jsonl` + `~/.claude.json#skillUsage` |
+| 8 — Skill Semantic Audit | Judgment-call checks the validator can't do — trigger quality, structure, resolvability |
+| 9 — Skill–Tool Contract | Declared `allowed-tools` vs actually-called tools, per skill |
+| 10 — Frontmatter Strict Schema | Description min length, `model` whitelist, `allowed-tools` syntax, unknown fields (runs inside Phase 5) |
+| 11 — Reference Graph Health | Cycles, depth violations, orphan ref files |
+| 12 — CLAUDE.md Content Quality | Whether each CLAUDE.md actually helps — stale commands, generic boilerplate, thin coverage |
+| 13 — Body Compression | Detects high-filler bodies; `--compress-bodies` opens the opt-in caveman:lite rewrite path |
+| 14 — Hooks, Agents, Settings | Registration, duplication, timeouts, broad patterns, stale reminders, risky security keys (`bypassPermissions`, `enableAllProjectMcpServers`) |
+| 15 — Permission Allowlist Hygiene | Dead entries, over-broad `:*` patterns |
+| 16 — Hook Latency + Reliability | Per-hook failure-rate, never-fired hooks, event-type mismatches |
+| 17 — Cross-references + Orphans | Dead paths, orphaned guides/patterns, missing triggers, memory-index overflow |
+| 18 — Orphan Repurposing | For each orphan, propose repurposing into an existing skill before deletion |
+| 19 — Cross-Session Pattern Mining | Recurring denials, correction clusters, missing-skill gaps |
+| 20 — Auto-memory Hygiene | Dead `- [Title](file.md)` links, orphan files, duplicates, stale dates |
+| 21 — Name Collisions | Same basename in `commands/` and `skills/` (runs inside Phase 5) |
+| 22 — Agents Never-Spawned | Agents on disk never invoked in window |
+| 23 — Token Trend | Per-session input/output/cache tokens — low cache-hit, output bloat |
+| 24 — Report | A mandatory pre-print pass first **grounds every judgment finding** (drop / downgrade / keep-with-`Evidence:`), then renders a scorecard + findings grouped by area, each a plain-language line with a must-fix / should / polish chip and a trailing tag code; optional summary blocks per active phase |
+| 25 — Post-Report Menu | Pick a fix scope, apply, re-validate, loop until done |
+| 26 — Output Styles | `.claude/output-styles/*.md` vs the selected `outputStyle`: flags a selection with no matching style file (runs in the scan band, feeds the Phase 24 report) |
+| 27 — Context Coherence | The assembled context judged as one document: over-constrained prose, a directive repeated verbatim in two files, and directives that contradict each other |
 
 ## Migration note
 

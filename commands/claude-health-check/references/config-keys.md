@@ -6,8 +6,7 @@ applies when a key is absent.
 **Load order & precedence:** `~/.claude/markdown-health-check.json` (user defaults)
 is merged with `./.claude/markdown-health-check.json` (project overrides win key by
 key). A CLI argument always wins over both — e.g. `--window-days=14` overrides
-`windowDays`, and `quick`/`deep` override `depth`. So precedence is **CLI > project
-config > user config > default**.
+`windowDays`. So precedence is **CLI > project config > user config > default**.
 
 Each default carries a **Why** — Ousterhout's law: no voodoo constants. Most tuning
 is also reachable via CLI flags; the config file just makes a choice persistent.
@@ -17,7 +16,6 @@ is also reachable via CLI flags; the config file just makes a choice persistent.
 | Key | Type | Default | Meaning | Why this default |
 |-----|------|---------|---------|------------------|
 | `windowDays` | `number` | `30` | History window (days) for the telemetry phases (7, 9, 15, 16, 19, 22, 23) that read `history-scan.json`. Same knob as `--window-days=N`. | A month captures monthly-cadence skills and hooks without over-weighting activity that has already aged out of relevance. |
-| `depth` | `"auto"\|"quick"\|"standard"\|"deep"` | `"auto"` | Depth floor / override. `auto` picks Quick/Standard/Deep from ecosystem size (Phase 3); the others pin it. `quick`/`deep` CLI args override this. | `auto` is least-surprising — a small tree gets a fast pass, a large one a full audit, with no config needed. |
 | `verifyFindings` | `boolean` | `true` | Run the Pre-print evidence-grounding gate (`finding-verification.md`) over judgment findings. `false` emits judgment findings unverified. | Precision-by-default: an ungrounded finding is the one a user disputes. `false` exists only as a debugging escape hatch when you want to see the raw judgment output. |
 | `skipPhases` | `number[]` | `[]` | Phase numbers to skip entirely (e.g. `[23]` to drop the token-trend phase). Deterministic Phase 5 cannot be skipped — it is the spine. | Empty default: opt-in suppression only. Nothing is hidden unless the user asks. |
 | `compressBodies` | `boolean` | `false` | Persistent equivalent of `--compress-bodies` (Phase 13 opt-in body rewrite). | `false`: the body rewrite edits files and lands a branch, so it must be explicitly requested, never a silent default. |

@@ -44,7 +44,7 @@ eff=()
 [ -n "${HEALTH_CHECK_EVAL_EFFORT:-}" ] && eff=(--effort "$HEALTH_CHECK_EVAL_EFFORT")
 runs=${HEALTH_CHECK_EVAL_RUNS:-1}
 
-prompt='Run the /claude-health-check audit on this environment in DEEP mode (comprehensive — run every phase, including the skill semantic audit and the CLAUDE.md content-quality checks). Print ONLY the final health report (Phase 24). Do NOT run the Phase 25 post-report menu and do NOT call AskUserQuestion. Do NOT edit, write, move, or delete any file.'
+prompt='Run the /claude-health-check audit on this environment (it always runs every phase, including the skill semantic audit and the CLAUDE.md content-quality checks). Print ONLY the final health report (Phase 24). Do NOT run the Phase 25 post-report menu and do NOT call AskUserQuestion. Do NOT edit, write, move, or delete any file.'
 
 pass=0; fail=0; err=0
 for f in "$EVALS"/*.json; do
