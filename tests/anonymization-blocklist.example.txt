@@ -4,7 +4,7 @@
 # gitignored and never committed. Copy this file to that name and replace the
 # invented patterns below with the real employer / product / repo / internal
 # ticket-prefix / scanned-project names you must never leak into published
-# artifacts (commands/, tests/fixtures/, README.md).
+# artifacts (plugin/commands/, tests/fixtures/, README.md).
 #
 # Format: one POSIX extended-regex per line. Blank lines and #-comments ignored.
 # Matching is case-insensitive (grep -i). Keep patterns specific enough not to

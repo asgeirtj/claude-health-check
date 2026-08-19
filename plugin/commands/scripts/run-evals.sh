@@ -10,7 +10,7 @@
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
-EVALS="$REPO/commands/claude-health-check/evals"
+EVALS="$REPO/evals"
 filter="${1:-}"
 command -v jq >/dev/null 2>&1 || { echo "run-evals: jq is required." >&2; exit 2; }
 

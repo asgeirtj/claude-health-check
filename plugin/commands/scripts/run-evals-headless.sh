@@ -24,10 +24,11 @@
 # --dangerously-skip-permissions because every target is a throwaway fixture.
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"          # commands/scripts
-REPO="$(cd "$HERE/../.." && pwd)"
-EVALS="$REPO/commands/claude-health-check/evals"
+REPO="$(cd "$HERE/../.." && pwd)"          # plugin/
+ROOT="$(cd "$REPO/.." && pwd)"                 # repo root (fixtures live here)
+EVALS="$REPO/evals"
 CMD_MD="$REPO/commands/claude-health-check.md"
-REFS="$REPO/commands/claude-health-check/references"
+REFS="$REPO/references"
 filter="${1:-}"
 
 command -v claude >/dev/null 2>&1 || { echo "run-evals-headless: 'claude' CLI not found on PATH." >&2; exit 127; }
@@ -62,7 +63,7 @@ for f in "$EVALS"/*.json; do
     for ((r=1; r<=runs; r++)); do
         tmp=$(mktemp -d)
         mkdir -p "$tmp/.claude/commands/scripts" "$tmp/.claude/claude-health-check/references" "$tmp/.claude/.cache" "$tmp/work"
-        cp -r "$REPO/$dir/.claude/." "$tmp/.claude/" 2>/dev/null
+        cp -r "$ROOT/$dir/.claude/." "$tmp/.claude/" 2>/dev/null
         cp "$CMD_MD" "$tmp/.claude/commands/" 2>/dev/null
         cp "$REPO"/commands/scripts/*.sh "$tmp/.claude/commands/scripts/" 2>/dev/null
         # References go to the make-install location (top-level), NOT under
